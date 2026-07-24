@@ -1,0 +1,6 @@
+# Mandatory core deps: core/load_data + core/aggregate.
+# NOTHING here may pull in matplotlib/ffmpeg/cartopy — the core boundary is
+# render-agnostic (see docs/adr/0002-render-agnostic-core.md).
+h5py
+pandas
+numpy

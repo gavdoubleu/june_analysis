@@ -1,0 +1,5 @@
+# Optional: geographic projection + background fetch (static maps, animator).
+# Needs requirements-plotting.txt too.
+pyproj
+cartopy
+pillow

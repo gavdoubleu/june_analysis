@@ -1,0 +1,2 @@
+# Optional JIT speed-up for core/aggregate. Aggregate MUST run correctly without it.
+numba

@@ -1,0 +1,3 @@
+# Optional: static plots + epidemic curves (events_analysis notebooks).
+# Install alongside core: pip install -r requirements.txt -r requirements-plotting.txt
+matplotlib
