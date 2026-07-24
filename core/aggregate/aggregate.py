@@ -51,8 +51,9 @@ class Aggregate:
 
         A geo unit absent from the map, or with population 0, yields a NaN
         column (a per-unit gap is not the "no World file at all" case, which
-        errors earlier in `load_world`); missing units are warned about so a
-        genuine geo-level mismatch is not silently masked.
+        errors earlier in `load_world`); both absent and zero-population units
+        are warned about so a genuine geo-level mismatch — a zero-pop unit
+        carrying events included — is not silently masked.
         """
         populations = np.array(
             [population_by_geo_unit.get(int(geo_unit_id), np.nan)
@@ -60,11 +61,15 @@ class Aggregate:
             dtype="float64",
         )
 
-        missing = self.geo_unit_ids[np.isnan(populations)]
+        # Both absent-from-map (NaN) and zero-population units yield NaN rates;
+        # warn on either, since a zero-pop unit that still carries events is the
+        # same class of geo-level mismatch as an absent one.
+        no_population = np.isnan(populations) | (populations == 0)
+        missing = self.geo_unit_ids[no_population]
         if missing.size:
             logging.warning(
-                "%d geo unit(s) have no population and get NaN rates: %s. "
-                "Wrong world_state.h5, or a geo-level mismatch between events "
+                "%d geo unit(s) have no (or zero) population and get NaN rates: "
+                "%s. Wrong world_state.h5, or a geo-level mismatch between events "
                 "and world?",
                 missing.size,
                 missing.tolist(),

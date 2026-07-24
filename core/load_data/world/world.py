@@ -89,6 +89,11 @@ def load_world(path: str | Path) -> World:
             "and rate-per-100k; the events-only analysis path does not need it."
         )
     with h5py.File(path, "r") as world_file:
+        if "geography" not in world_file:
+            raise OSError(
+                f"World file {path} has no 'geography' group; it is not a valid "
+                "world_state.h5 (or was written by an incompatible version)."
+            )
         geo_names, level_registry = _read_geography_metadata(world_file)
         geography = load_geography(world_file["geography"], geo_names, level_registry)
         unit_statistics = compute_unit_statistics(
