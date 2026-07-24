@@ -33,8 +33,14 @@ pip install -r requirements-animation.txt                    # + mp4/gif video r
 pip install -r requirements-aggregate.txt                    # optional numba JIT speed-up
 ```
 
-`world_reader` (for `core/load_data/world`) installs from a MAY2 packaging shim —
-see Phase 3.
+`world_reader` (for `core/load_data/world`, i.e. maps + rate-per-100k) is an
+installed dependency, not vendored (see
+[docs/adr/0001](docs/adr/0001-vendor-june-events-depend-world-reader.md)). It ships
+inside the MAY2 repo with a minimal packaging shim; install it editable from there:
+
+```bash
+pip install -e /path/to/MAY2/may_world_visualiser   # exposes top-level world_reader
+```
 
 ## Imports
 

@@ -34,6 +34,13 @@ A time-binned per-**Geo unit** summary of events — counts, or rate-per-100k on
 population is known. Produced by `core/aggregate`, keyed on `geo_unit_id`.
 The reusable intermediate every **Consumer** builds on; exportable to CSV.
 
+**Population**:
+The resident count of a **Geo unit**, *subtree-aggregated* — a unit's population
+is the sum over its whole subtree, so it is defined at every **geo level** (a
+leaf's equals its direct residents; a parent's is the sum of its descendants').
+Read from the **World file**; the denominator that turns an **Aggregate**'s
+counts into rate-per-100k.
+
 **Consumer**:
 An application built on `core/` — a driver, notebook, or script that loads,
 aggregates, and renders. Lives in an app folder (`animations/`,

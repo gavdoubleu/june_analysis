@@ -12,6 +12,7 @@ through pandas.
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 
 import numpy as np
@@ -40,15 +41,40 @@ class Aggregate:
     days_per_bin: float
     event_type: str
 
-    def rate_per_100k(self, population_by_geo_unit):
-        """Phase-3 hook: per-100k rates given a {geo_unit_id: population} map.
+    def rate_per_100k(self, population_by_geo_unit) -> np.ndarray:
+        """Per-100k rates given a ``{geo_unit_id: population}`` map.
 
-        Population comes from the World file via `core/load_data/world`, which
-        does not exist yet (ADR-0003); wiring is deferred to Phase 3.
+        Returns a ``(n_bins, n_geo)`` float array aligned to ``geo_unit_ids``:
+        ``counts / population * 100_000``. Population comes from the World file
+        via `core/load_data/world` and is passed *in* (the aggregate never
+        imports that module — ADR-0003).
+
+        A geo unit absent from the map, or with population 0, yields a NaN
+        column (a per-unit gap is not the "no World file at all" case, which
+        errors earlier in `load_world`); missing units are warned about so a
+        genuine geo-level mismatch is not silently masked.
         """
-        raise NotImplementedError(
-            "rate_per_100k needs population from a World file; wired in Phase 3"
+        populations = np.array(
+            [population_by_geo_unit.get(int(geo_unit_id), np.nan)
+             for geo_unit_id in self.geo_unit_ids],
+            dtype="float64",
         )
+
+        missing = self.geo_unit_ids[np.isnan(populations)]
+        if missing.size:
+            logging.warning(
+                "%d geo unit(s) have no population and get NaN rates: %s. "
+                "Wrong world_state.h5, or a geo-level mismatch between events "
+                "and world?",
+                missing.size,
+                missing.tolist(),
+            )
+
+        # Zero population -> undefined rate (NaN, not inf); guard the divide.
+        with np.errstate(divide="ignore", invalid="ignore"):
+            rate = self.counts / populations * 100_000.0
+        rate[:, populations == 0] = np.nan
+        return rate
 
 
 def _resolve_geo_unit(enriched_events: pd.DataFrame, geo_priority) -> np.ndarray:
