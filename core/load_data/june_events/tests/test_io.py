@@ -48,6 +48,21 @@ def test_load_raw_table_projects_requested_columns(tmp_path):
     assert list(projected["time"]) == [0.0, 1.0, 2.0, 3.0]
 
 
+def test_load_raw_table_unknown_column_raises_keyerror_listing_valid(tmp_path):
+    import numpy as np
+
+    path = tmp_path / "unknown_column_simulation_events.h5"
+    dtype = [("person_id", "<i4"), ("venue_id", "<i4"), ("time", "<f8")]
+    rows = np.array([(i, i * 10, float(i)) for i in range(4)], dtype=dtype)
+    with h5py.File(path, "w") as fh:
+        fh.create_dataset("events/deaths", data=rows)
+
+    with pytest.raises(KeyError, match="nonsense") as excinfo:
+        load_raw_table(str(path), "events/deaths", columns=["time", "nonsense"])
+    # Friendly message lists the valid columns from the single open handle.
+    assert "person_id" in str(excinfo.value)
+
+
 def test_load_raw_table_projects_columns_in_chunked_path(tmp_path):
     import numpy as np
 

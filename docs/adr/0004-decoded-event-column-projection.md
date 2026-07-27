@@ -46,3 +46,7 @@ or raw passthrough fields (`time`, `person_id`) — **never** the raw `*_id` fie
 - The `infector_id` mask dependency is implicit: asking for `infector_symptom`
   quietly reads `infector_id` too (then discards it). Documented here and in the
   `load_decoded_events` docstring so it is not surprising.
+- Validation for projected **lookup** reads (`load_venues_lookup` /
+  `load_people_lookup`) now lives in `load_raw_table`, sharing this same
+  friendly-`KeyError` contract — the check runs from the single open read handle,
+  so a projected lookup read no longer re-peeks the header (was one open per read).

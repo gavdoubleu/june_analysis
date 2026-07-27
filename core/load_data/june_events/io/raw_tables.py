@@ -13,12 +13,23 @@ def load_raw_table(
     chunk_threshold_bytes: int = 500_000_000,
     chunk_rows: int = 5_000_000,
 ):
+    # Owns projected-column validation: because the file is already open here,
+    # bad `columns` raise the friendly KeyError from the single read handle — no
+    # separate header peek. Names speak the raw stored fields (dtype.names).
     with h5py.File(path, "r") as fh:
         if dataset_path not in fh:
             logger.warning("dataset %r not found in %r", dataset_path, path)
             return None
 
         dset = fh[dataset_path]
+        available = dset.dtype.names
+        if columns is not None and available is not None:
+            unknown = [name for name in columns if name not in available]
+            if unknown:
+                raise KeyError(
+                    f"unknown column(s) {unknown!r} for {dataset_path!r}; "
+                    f"valid columns are {list(available)!r}"
+                )
         # Project the requested fields at read time (h5py reads only those into
         # memory) so a wide event table costs RAM in proportion to the columns
         # actually wanted; None reads the whole compound record as before.

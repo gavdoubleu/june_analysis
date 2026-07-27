@@ -1,6 +1,5 @@
 import h5py
 
-from ..introspect import dataset_field_names
 from .raw_tables import load_raw_table
 
 _PEOPLE_PROPERTIES_GROUP = "lookups/people_properties"
@@ -22,23 +21,9 @@ def _decode_byte_columns(df):
     return df
 
 
-def _validate_columns(path: str, dataset_path: str, columns):
-    # Names speak the raw stored fields (no registry decode here, unlike
-    # load_decoded_events) — reject anything not in the compound record.
-    available = dataset_field_names(path, dataset_path)
-    if available is None:
-        return
-    unknown = [name for name in columns if name not in available]
-    if unknown:
-        raise KeyError(
-            f"unknown column(s) {unknown!r} for {dataset_path!r}; "
-            f"valid columns are {list(available)!r}"
-        )
-
-
 def load_venues_lookup(path: str, columns: list[str] | None = None):
-    if columns is not None:
-        _validate_columns(path, VENUES_DATASET, columns)
+    # Column validation (friendly KeyError on unknown names) is owned by
+    # load_raw_table, which validates from its single open read handle.
     venues = load_raw_table(path, VENUES_DATASET, columns=columns)
     if venues is None:
         return None
@@ -51,9 +36,7 @@ def load_people_lookup(
     # `columns` projects the main lookups/people record only; property names
     # live in separate datasets and are never requestable here. Field
     # projection keeps every row, so the positional people_properties alignment
-    # below is unaffected.
-    if columns is not None:
-        _validate_columns(path, PEOPLE_DATASET, columns)
+    # below is unaffected. Column validation is owned by load_raw_table.
     people = load_raw_table(path, PEOPLE_DATASET, columns=columns)
     if people is None:
         return None

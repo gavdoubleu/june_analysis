@@ -75,6 +75,25 @@ def test_lookup_columns_unknown_name_raises_keyerror_listing_valid(tmp_path, loa
         loader(_write_lookups(tmp_path / "e.h5"), columns=["nonsense"])
 
 
+def test_projected_lookup_read_opens_file_once_no_validation_repeek(tmp_path, monkeypatch):
+    """I/O-economy guard: validation now runs inside load_raw_table's single open
+    handle, so a projected read must open the file once, not twice (the old
+    _validate_columns re-peek). A re-introduced separate peek pushes this to 2."""
+    real_open = h5py.File
+    opens = []
+
+    def counting_open(*args, **kwargs):
+        opens.append(args[0] if args else kwargs.get("name"))
+        return real_open(*args, **kwargs)
+
+    path = _write_lookups(tmp_path / "e.h5")
+    monkeypatch.setattr(h5py, "File", counting_open)
+
+    load_venues_lookup(path, columns=["venue_id", "geo_unit_id"])
+
+    assert len(opens) == 1
+
+
 @requires_real_file
 def test_load_venues_lookup_decodes_byte_columns_to_str():
     venues = load_venues_lookup(REAL_EVENTS_FILE)
