@@ -8,6 +8,73 @@ from .conftest import REAL_EVENTS_FIXTURE as REAL_EVENTS_FILE
 from .conftest import requires_real_events_fixture as requires_real_file
 
 
+def _write_lookups(path):
+    with h5py.File(path, "w") as fh:
+        venues = np.array(
+            [(10, b"school", b"education", 100), (11, b"home", b"residence", 200)],
+            dtype=[
+                ("venue_id", "<i4"),
+                ("name", "S16"),
+                ("type", "S16"),
+                ("geo_unit_id", "<i4"),
+            ],
+        )
+        fh.create_dataset("lookups/venues", data=venues)
+
+        people = np.array(
+            [(1, 30.0, 5), (2, 40.0, 6)],
+            dtype=[("person_id", "<i4"), ("age", "<f8"), ("geo_unit_id", "<i4")],
+        )
+        fh.create_dataset("lookups/people", data=people)
+        fh.create_dataset(
+            "lookups/people_properties/ethnicity",
+            data=np.array([b"a", b"b"], dtype="S1"),
+        )
+    return str(path)
+
+
+def test_load_venues_lookup_columns_projects_to_requested_fields(tmp_path):
+    venues = load_venues_lookup(
+        _write_lookups(tmp_path / "e.h5"), columns=["venue_id", "geo_unit_id"]
+    )
+    assert list(venues.columns) == ["venue_id", "geo_unit_id"]
+
+
+def test_load_venues_lookup_columns_still_decodes_byte_kind_projection(tmp_path):
+    venues = load_venues_lookup(
+        _write_lookups(tmp_path / "e.h5"), columns=["venue_id", "type"]
+    )
+    assert list(venues.columns) == ["venue_id", "type"]
+    assert isinstance(venues["type"].iloc[0], str)
+    assert venues["type"].iloc[0] == "education"
+
+
+def test_load_people_lookup_columns_compose_with_properties(tmp_path):
+    people = load_people_lookup(
+        _write_lookups(tmp_path / "e.h5"),
+        include_properties=True,
+        columns=["person_id", "geo_unit_id"],
+    )
+    # Projected main columns first, then the appended property column.
+    assert list(people.columns) == ["person_id", "geo_unit_id", "ethnicity"]
+    assert people["ethnicity"].iloc[0] == "a"
+
+
+def test_load_people_lookup_columns_without_properties_stays_narrow(tmp_path):
+    people = load_people_lookup(
+        _write_lookups(tmp_path / "e.h5"),
+        include_properties=False,
+        columns=["person_id", "geo_unit_id"],
+    )
+    assert list(people.columns) == ["person_id", "geo_unit_id"]
+
+
+@pytest.mark.parametrize("loader", [load_venues_lookup, load_people_lookup])
+def test_lookup_columns_unknown_name_raises_keyerror_listing_valid(tmp_path, loader):
+    with pytest.raises(KeyError, match="nonsense"):
+        loader(_write_lookups(tmp_path / "e.h5"), columns=["nonsense"])
+
+
 @requires_real_file
 def test_load_venues_lookup_decodes_byte_columns_to_str():
     venues = load_venues_lookup(REAL_EVENTS_FILE)

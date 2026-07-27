@@ -25,7 +25,12 @@ _Avoid_: events dataframe (ambiguous with enriched output).
 A `lookups/*` table (`people`, `venues`, `people_properties/*`,
 `population_summary`) that maps an id (`person_id`, `venue_id`) to static
 metadata about that entity — one row per id. Loaded by `io/`, joined onto
-event tables by `enrich/`. A duplicate id is treated as corruption, not a
+event tables by `enrich/`. Can be read **projected** to a subset of its stored
+fields (a `columns=` argument naming the raw field names on disk, not decoded
+output names — a Lookup table has no **Registry decode** step), so a caller
+wanting only a couple of columns pays RAM in proportion to them, not the whole
+record. Independent of `people_properties` expansion, which is a separate
+positional attach. A duplicate id is treated as corruption, not a
 legitimate multi-row entity: `enrich/` raises on it by default. Callers who
 need to force the merge through anyway (e.g. to inspect corrupt data rather
 than fail outright) can opt out via an explicit parameter — the fan-out is
@@ -92,7 +97,10 @@ because different `simulation_events.h5` files vary — different registries,
 different venue types, some missing `coordinated_encounters` or
 `people_properties` entirely. Lives in `introspect/`, separate from `io/`
 because it answers "what's in this file" rather than "give me this file's
-data".
+data". `inspect_file` walks the whole file; `dataset_field_names` is the
+targeted case — the compound field-name tuple of one named dataset (header
+only), e.g. to test whether a Lookup table carries `geo_unit_id` before
+projecting it.
 
 **Seam**:
 The one file per subfolder (`io/__init__.py`, `decode/__init__.py`, etc.)

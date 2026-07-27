@@ -1,7 +1,8 @@
 import h5py
+import numpy as np
 import pytest
 
-from ..introspect import inspect_file
+from ..introspect import dataset_field_names, inspect_file
 
 from .conftest import REAL_EVENTS_FIXTURE as REAL_EVENTS_FILE
 from .conftest import requires_real_events_fixture as requires_real_file
@@ -61,6 +62,34 @@ def test_inspect_file_never_reads_event_or_lookup_row_data(monkeypatch):
     )
     with h5py.File(REAL_EVENTS_FILE, "r") as fh:
         assert encounters.n_rows == fh["events/coordinated_encounters"].shape[0]
+
+
+def test_dataset_field_names_returns_compound_names_without_reading_rows(tmp_path):
+    path = tmp_path / "e.h5"
+    dtype = [("venue_id", "<i4"), ("geo_unit_id", "<i4"), ("name", "S8")]
+    with h5py.File(path, "w") as fh:
+        fh.create_dataset(
+            "lookups/venues", data=np.array([(1, 2, b"x")], dtype=dtype)
+        )
+
+    original_getitem = h5py.Dataset.__getitem__
+
+    def guarded_getitem(self, key):
+        raise AssertionError(f"read row data from {self.name!r}")
+
+    with pytest.MonkeyPatch.context() as monkeypatch:
+        monkeypatch.setattr(h5py.Dataset, "__getitem__", guarded_getitem)
+        names = dataset_field_names(str(path), "lookups/venues")
+
+    assert names == ("venue_id", "geo_unit_id", "name")
+
+
+def test_dataset_field_names_returns_none_for_absent_dataset(tmp_path):
+    path = tmp_path / "e.h5"
+    with h5py.File(path, "w") as fh:
+        fh.create_dataset("lookups/venues", data=np.array([(1,)], dtype=[("venue_id", "<i4")]))
+
+    assert dataset_field_names(str(path), "lookups/people") is None
 
 
 def test_inspect_file_handles_file_missing_optional_tables(tmp_path):

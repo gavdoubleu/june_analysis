@@ -14,11 +14,13 @@ minimal). No render deps are imported here (ADR-0002).
 
 from __future__ import annotations
 
-import h5py
 import numpy as np
 import pandas as pd
 
 from .june_events import (
+    PEOPLE_DATASET,
+    VENUES_DATASET,
+    dataset_field_names,
     enrich_with_people,
     enrich_with_venues,
     load_decoded_events,
@@ -26,30 +28,14 @@ from .june_events import (
     load_venues_lookup,
 )
 
-# Geo-source name -> (event id column, its prefixed geo column after the join).
+# Geo-source name -> (event id column, its prefixed geo column after the join,
+# lookup dataset path the geo unit is read from).
 _GEO_SOURCES = {
-    "venue": ("venue_id", "venue_geo_unit_id"),
-    "person": ("person_id", "person_geo_unit_id"),
+    "venue": ("venue_id", "venue_geo_unit_id", VENUES_DATASET),
+    "person": ("person_id", "person_geo_unit_id", PEOPLE_DATASET),
 }
 
 _LOOKUP_GEO_COLUMN = "geo_unit_id"
-
-
-def _peek_field_names(path: str, dataset_path: str):
-    # Header-only read of the compound dtype — which id columns exist — without
-    # loading any row data.
-    with h5py.File(path, "r") as fh:
-        if dataset_path not in fh:
-            return None
-        return fh[dataset_path].dtype.names
-
-
-def _geo_only_lookup(lookup, id_column: str):
-    # Narrow a full lookup to just [id_column, geo_unit_id] so the join attaches
-    # one geo column, not the whole entity metadata.
-    if lookup is None or _LOOKUP_GEO_COLUMN not in lookup.columns:
-        return None
-    return lookup[[id_column, _LOOKUP_GEO_COLUMN]]
 
 
 def load_geo_events(
@@ -65,7 +51,7 @@ def load_geo_events(
     skipped, not an error). Rows with no resolvable geo unit keep ``NaN`` —
     ``aggregate_events`` drops them. Returns ``None`` if the dataset is absent.
     """
-    raw_fields = _peek_field_names(path, dataset_path)
+    raw_fields = dataset_field_names(path, dataset_path)
     if raw_fields is None:
         return None
 
@@ -88,20 +74,22 @@ def load_geo_events(
                 f"unknown geo source {source!r}; expected one of "
                 f"{sorted(_GEO_SOURCES)}"
             )
-        id_column, geo_column = _GEO_SOURCES[source]
+        id_column, geo_column, lookup_dataset = _GEO_SOURCES[source]
         if id_column not in events.columns:
             continue
+        # Peek then project: skip a source whose lookup lacks geo_unit_id
+        # (absent source, not an error) rather than let the projected read raise.
+        lookup_fields = dataset_field_names(path, lookup_dataset)
+        if lookup_fields is None or _LOOKUP_GEO_COLUMN not in lookup_fields:
+            continue
+        projection = [id_column, _LOOKUP_GEO_COLUMN]
         if source == "venue":
-            lookup = _geo_only_lookup(load_venues_lookup(path), id_column)
-            if lookup is None:
-                continue
+            lookup = load_venues_lookup(path, columns=projection)
             joined = enrich_with_venues(events[[id_column]], lookup)
         else:
-            lookup = _geo_only_lookup(
-                load_people_lookup(path, include_properties=False), id_column
+            lookup = load_people_lookup(
+                path, include_properties=False, columns=projection
             )
-            if lookup is None:
-                continue
             joined = enrich_with_people(events[[id_column]], lookup)
         resolved = resolved.fillna(joined[geo_column])
 

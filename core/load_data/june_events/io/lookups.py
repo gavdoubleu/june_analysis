@@ -1,8 +1,14 @@
 import h5py
 
+from ..introspect import dataset_field_names
 from .raw_tables import load_raw_table
 
 _PEOPLE_PROPERTIES_GROUP = "lookups/people_properties"
+
+# Single source of truth for the lookup dataset paths — kept here (behind the
+# lookup seam) so consumers ask for "venues"/"people" data, not file layout.
+VENUES_DATASET = "lookups/venues"
+PEOPLE_DATASET = "lookups/people"
 
 
 def _decode_value(value):
@@ -16,15 +22,39 @@ def _decode_byte_columns(df):
     return df
 
 
-def load_venues_lookup(path: str):
-    venues = load_raw_table(path, "lookups/venues")
+def _validate_columns(path: str, dataset_path: str, columns):
+    # Names speak the raw stored fields (no registry decode here, unlike
+    # load_decoded_events) — reject anything not in the compound record.
+    available = dataset_field_names(path, dataset_path)
+    if available is None:
+        return
+    unknown = [name for name in columns if name not in available]
+    if unknown:
+        raise KeyError(
+            f"unknown column(s) {unknown!r} for {dataset_path!r}; "
+            f"valid columns are {list(available)!r}"
+        )
+
+
+def load_venues_lookup(path: str, columns: list[str] | None = None):
+    if columns is not None:
+        _validate_columns(path, VENUES_DATASET, columns)
+    venues = load_raw_table(path, VENUES_DATASET, columns=columns)
     if venues is None:
         return None
     return _decode_byte_columns(venues)
 
 
-def load_people_lookup(path: str, include_properties: bool = True):
-    people = load_raw_table(path, "lookups/people")
+def load_people_lookup(
+    path: str, include_properties: bool = True, columns: list[str] | None = None
+):
+    # `columns` projects the main lookups/people record only; property names
+    # live in separate datasets and are never requestable here. Field
+    # projection keeps every row, so the positional people_properties alignment
+    # below is unaffected.
+    if columns is not None:
+        _validate_columns(path, PEOPLE_DATASET, columns)
+    people = load_raw_table(path, PEOPLE_DATASET, columns=columns)
     if people is None:
         return None
     people = _decode_byte_columns(people)

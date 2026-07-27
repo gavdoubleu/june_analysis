@@ -73,3 +73,28 @@ def test_source_absent_from_event_type_falls_through(tmp_path):
 
 def test_absent_dataset_returns_none(tmp_path):
     assert load_geo_events(_write_file(tmp_path / "e.h5"), "events/nope") is None
+
+
+def test_lookup_without_geo_unit_id_skips_source_not_raises(tmp_path):
+    # Venues lookup carries no geo_unit_id: peek-then-project must skip the venue
+    # source (fall through to person), not raise on the projected read.
+    path = tmp_path / "e.h5"
+    with h5py.File(path, "w") as fh:
+        infections = np.array(
+            [(1, 10, 0.1), (2, 11, 0.2)],
+            dtype=[("person_id", "<i4"), ("venue_id", "<i4"), ("time", "<f8")],
+        )
+        fh.create_dataset("events/infections", data=infections)
+        venues = np.array(
+            [(10, b"x"), (11, b"y")],
+            dtype=[("venue_id", "<i4"), ("name", "S8")],
+        )
+        fh.create_dataset("lookups/venues", data=venues)
+        people = np.array(
+            [(1, 1), (2, 2)],
+            dtype=[("person_id", "<i4"), ("geo_unit_id", "<i4")],
+        )
+        fh.create_dataset("lookups/people", data=people)
+
+    located = load_geo_events(str(path), "events/infections")
+    np.testing.assert_array_equal(located["geo_unit_id"].to_numpy(), [1.0, 2.0])
