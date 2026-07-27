@@ -51,6 +51,23 @@ fraction of an **Enriched event table** (which joins the whole people+venue
 metadata). Produced by `load_geo_events` / `SimulationEvents.geo_events`. Sits
 between the **Decoded** and **Enriched event table**s.
 
+**Geo source**:
+One of the two ways a **Located event table** resolves a **Geo unit** for an
+event — the *venue* it occurred at, or the *person* involved — each read from
+its **Lookup table**. Coalesced venue-then-person by priority. A source that
+cannot supply a geo unit is skipped, not an error: either **Absent** or
+**Malformed**.
+
+**Absent source**:
+A **Geo source** with nothing to join from — the event type lacks its id
+column, or its **Lookup table** is missing. Expected (event types carry
+different ids); skipped silently.
+
+**Malformed source**:
+A **Geo source** whose **Lookup table** exists but cannot yield a **Geo unit** —
+it lacks `geo_unit_id` or its own id column. Signals partial/corrupt output;
+skipped, not raised.
+
 **Aggregate**:
 A time-binned per-**Geo unit** summary of events — counts, or rate-per-100k once
 population is known. Produced by `core/aggregate` from a **Located event table**,

@@ -14,6 +14,8 @@ divergence minimal. No render deps are imported here (ADR-0002).
 
 from __future__ import annotations
 
+import logging
+
 import numpy as np
 import pandas as pd
 
@@ -37,6 +39,8 @@ _GEO_SOURCES = {
 
 _LOOKUP_GEO_COLUMN = "geo_unit_id"
 
+logger = logging.getLogger(__name__)
+
 
 def load_geo_events(
     path: str,
@@ -47,8 +51,11 @@ def load_geo_events(
     """Load one event type as ``time, geo_unit_id`` — the *Located event table*.
 
     Resolves each event's geo unit by joining **only** ``geo_unit_id`` from the
-    venue/person lookups and coalescing per ``geo_priority`` (an absent source is
-    skipped, not an error). Rows with no resolvable geo unit keep ``NaN`` —
+    venue/person lookups and coalescing per ``geo_priority``. A source that
+    cannot supply a geo unit is skipped, not an error — whether **absent** (its
+    id column isn't on this event type, or its lookup is missing) or
+    **malformed** (the lookup exists but lacks ``geo_unit_id`` or its own id
+    column; logged at DEBUG). Rows with no resolvable geo unit keep ``NaN`` —
     ``aggregate_events`` drops them. Returns ``None`` if the dataset is absent.
     """
     for source in geo_priority:
@@ -79,10 +86,29 @@ def load_geo_events(
         id_column, geo_column, lookup_dataset = _GEO_SOURCES[source]
         if id_column not in events.columns:
             continue
-        # Peek then project: skip a source whose lookup lacks geo_unit_id
-        # (absent source, not an error) rather than let the projected read raise.
+        # Peek then project: skip a source whose lookup can't supply geo,
+        # rather than let the projected read raise. Two skip cases:
+        #   absent   - lookup dataset missing: nothing to join from (silent).
+        #   malformed - dataset exists but lacks a projected column (below).
         lookup_fields = dataset_field_names(path, lookup_dataset)
-        if lookup_fields is None or _LOOKUP_GEO_COLUMN not in lookup_fields:
+        if lookup_fields is None:
+            continue  # absent source: lookup dataset missing
+        missing = [
+            column
+            for column in (id_column, _LOOKUP_GEO_COLUMN)
+            if column not in lookup_fields
+        ]
+        if missing:
+            # Malformed source: dataset exists but can't yield geo. Skip
+            # (contract: not an error), but surface it — load_raw_table's strict
+            # projection validation (ADR-0004) would otherwise KeyError here;
+            # soft-skip is the geo side's job (ADR-0005).
+            logger.debug(
+                "skipping %s geo source: lookup %r missing %r",
+                source,
+                lookup_dataset,
+                missing,
+            )
             continue
         projection = [id_column, _LOOKUP_GEO_COLUMN]
         if source == "venue":
