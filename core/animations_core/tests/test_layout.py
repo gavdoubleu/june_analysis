@@ -54,6 +54,20 @@ def test_axis_projection_defaults_to_data_utm_but_is_pluggable():
         _close(custom_scene)
 
 
+def test_crs_from_name_resolves_named_projections_and_default():
+    import cartopy.crs as ccrs
+
+    assert layout.crs_from_name(None) is None  # default -> data UTM
+    assert layout.crs_from_name("utm") is None  # explicit UTM -> data CRS
+    assert isinstance(layout.crs_from_name("PlateCarree"), ccrs.PlateCarree)
+    assert isinstance(layout.crs_from_name("mercator"), ccrs.Mercator)
+
+
+def test_crs_from_name_rejects_unknown():
+    with pytest.raises(ValueError, match="projection"):
+        layout.crs_from_name("bananas")
+
+
 def test_date_text_is_rewritable_by_the_frame_loop():
     scene = layout.create_layout((6.0, 8.0), 100, UTM_BBOX, EPSG)
     try:

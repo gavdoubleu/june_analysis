@@ -112,6 +112,24 @@ def test_prepare_inference_supplies_missing_coordinate():
     assert len(prepared.smoothed_grids) == 2  # inference filled the gap
 
 
+def test_config_projection_sets_the_axis_crs():
+    pytest.importorskip("matplotlib")
+    import cartopy.crs as ccrs
+    import matplotlib
+
+    matplotlib.use("Agg")
+
+    config = RenderConfig(projection="platecarree")
+    prepared = render.prepare(_aggregate(n_bins=2), _world(), config)
+    scene, _mappable = prepared.build_layout()
+    try:
+        assert isinstance(scene.map_axis.projection, ccrs.PlateCarree)
+    finally:
+        import matplotlib.pyplot as plt
+
+        plt.close(scene.figure)
+
+
 def test_draw_frame_updates_heatmap_and_date_ticker():
     pytest.importorskip("matplotlib")
     pytest.importorskip("cartopy")

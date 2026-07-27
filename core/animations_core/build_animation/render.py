@@ -78,6 +78,7 @@ class Prepared:
             self.config.dpi,
             self.utm_bbox,
             self.epsg,
+            projection=layout_module.crs_from_name(self.config.projection),
             title=self.config.title,
         )
         basemap_array = self._load_basemap()

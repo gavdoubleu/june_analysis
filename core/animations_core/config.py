@@ -33,6 +33,9 @@ class RenderConfig:
     grid_resolution: float = 1.0  # cells per km (UTM); tune per render
     sigma: float = 2.0  # Gaussian smoothing, grid-cell units
 
+    # --- map projection ----------------------------------------------------
+    projection: str | None = None  # axis CRS name; None -> UTM (the data CRS)
+
     # --- figure / output ---------------------------------------------------
     figure_height: float = 8.0  # inches; width derived from bbox aspect
     fps: int = 10

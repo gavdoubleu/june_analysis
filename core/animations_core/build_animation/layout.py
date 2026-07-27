@@ -50,6 +50,33 @@ def _utm_crs(epsg: int):
     return ccrs.UTM(zone=zone, southern_hemisphere=southern)
 
 
+def crs_from_name(name: str | None):
+    """Resolve a ``RenderConfig.projection`` name to a cartopy CRS.
+
+    ``None`` (and ``"utm"``) return ``None`` — the caller then defaults the axis
+    to the UTM data CRS. Other names select a non-UTM axis projection, e.g. to
+    match a real map backdrop. Unknown names raise ``ValueError`` rather than
+    silently falling back. Lazy-imports cartopy (ADR-0002).
+    """
+    if name is None:
+        return None
+    import cartopy.crs as ccrs
+
+    named = {
+        "utm": None,  # sentinel: use the UTM data CRS
+        "platecarree": ccrs.PlateCarree,
+        "mercator": ccrs.Mercator,
+    }
+    key = name.strip().lower()
+    if key not in named:
+        raise ValueError(
+            f"Unknown projection {name!r}; expected one of {sorted(named)} "
+            "(None also means UTM)."
+        )
+    factory = named[key]
+    return None if factory is None else factory()
+
+
 def create_layout(
     figsize: tuple[float, float],
     dpi: int,
