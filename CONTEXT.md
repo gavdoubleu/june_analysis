@@ -81,6 +81,32 @@ leaf's equals its direct residents; a parent's is the sum of its descendants').
 Read from the **World file**; the denominator that turns an **Aggregate**'s
 counts into rate-per-100k.
 
+**Frame**:
+One rendered image in an animation — and **exactly one Aggregate bin**. The
+animator rasterises `counts[bin, :]` (or rate) into a **Density heatmap**; it
+never re-bins. The config's `days_per_frame` *is* the Aggregate's `days_per_bin`,
+one knob seen from two layers — there is no second binning step below the engine.
+_Avoid_: treating `days_per_frame` and `days_per_bin` as independent.
+
+**Density heatmap**:
+How each **Frame** is drawn (ADR-0007): per-**Geo unit** scalars are rasterised
+onto a UTM grid, Gaussian-smoothed (`sigma`), and shown as a continuous field —
+not one mark per unit. Empty cells are transparent, so the **Basemap** shows
+through and the colour scale stays global across all frames.
+_Avoid_: reading heat as centroid crowding — see **Cell rate**.
+
+**Cell rate**:
+A heatmap cell's rate, re-derived as `cell_counts / cell_population × 1e5` from
+counts and **Population** accumulated into *separate* grids. Being a ratio of
+summed extensives, it is independent of how many centroids fall in the cell.
+_Avoid_: summing per-unit rates into a cell — crowded cells would read hot from
+density alone, the artefact this re-derivation exists to kill.
+
+**Basemap**:
+The shaded-relief tile a **Frame** sits on, fetched once per `(bbox, zone,
+resolution)` and cached (ArcGIS World_Shaded_Relief, no key). A failed fetch
+degrades to a blank background unless `require_basemap` makes it a hard error.
+
 **Consumer**:
 An application built on `core/` — a driver, notebook, or script that loads,
 aggregates, and renders. Lives in an app folder (`animations/`,
