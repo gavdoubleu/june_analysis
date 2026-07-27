@@ -99,6 +99,17 @@ def test_axis_projection_defaults_to_utm_but_is_pluggable():
         _close(plate_scene)
 
 
+# --- 2b: a named non-UTM projection (mercator) is selected ---------------
+def test_mercator_projection_selected_by_name():
+    import cartopy.crs as ccrs
+
+    scene = _scene(projection="mercator")
+    try:
+        assert isinstance(scene.figure.axes[0].projection, ccrs.Mercator)
+    finally:
+        _close(scene)
+
+
 # --- 3: unknown projection rejected --------------------------------------
 def test_unknown_projection_raises():
     with pytest.raises(ValueError, match="projection"):
@@ -110,6 +121,21 @@ def test_no_basemap_adds_no_image():
     scene = _scene()  # fixture stubs load_basemap -> None
     try:
         assert len(scene.figure.axes[0].images) == 0
+    finally:
+        _close(scene)
+
+
+# --- 4b: a supplied basemap array is drawn beneath the heatmap -----------
+def test_basemap_array_is_drawn_beneath_the_heatmap(monkeypatch):
+    basemap_array = np.full((8, 6, 3), 100, dtype=np.uint8)
+    monkeypatch.setattr(
+        basemap_module, "load_basemap", lambda *a, **k: basemap_array
+    )
+    scene = _scene()  # basemap drawn in __init__, before any frame
+    try:
+        images = scene.figure.axes[0].images
+        assert len(images) == 1
+        assert images[0].zorder == 0  # sits under the heatmap layer
     finally:
         _close(scene)
 
