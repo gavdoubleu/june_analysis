@@ -191,6 +191,16 @@ def test_save_writes_gif_and_png(tmp_path):
     assert png.exists() and png.stat().st_size > 0
 
 
+# --- 7b: animate() one-liner writes a non-empty file ---------------------
+def test_animate_writes_a_non_empty_file(tmp_path):
+    pytest.importorskip("PIL")
+    from core.animations_core import animate
+
+    out = tmp_path / "one_liner.gif"
+    animate(_aggregate(), _FakeWorld(), RenderConfig(), str(out))
+    assert out.exists() and out.stat().st_size > 0
+
+
 # --- 8: encode streams draw() one frame at a time ------------------------
 def test_encode_streams_draw_per_frame(tmp_path):
     pytest.importorskip("PIL")
