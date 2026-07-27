@@ -51,6 +51,13 @@ def load_geo_events(
     skipped, not an error). Rows with no resolvable geo unit keep ``NaN`` —
     ``aggregate_events`` drops them. Returns ``None`` if the dataset is absent.
     """
+    for source in geo_priority:
+        if source not in _GEO_SOURCES:
+            raise ValueError(
+                f"unknown geo source {source!r}; expected one of "
+                f"{sorted(_GEO_SOURCES)}"
+            )
+
     raw_fields = dataset_field_names(path, dataset_path)
     if raw_fields is None:
         return None
@@ -69,11 +76,6 @@ def load_geo_events(
 
     resolved = pd.Series(np.nan, index=events.index, dtype="float64")
     for source in geo_priority:
-        if source not in _GEO_SOURCES:
-            raise ValueError(
-                f"unknown geo source {source!r}; expected one of "
-                f"{sorted(_GEO_SOURCES)}"
-            )
         id_column, geo_column, lookup_dataset = _GEO_SOURCES[source]
         if id_column not in events.columns:
             continue

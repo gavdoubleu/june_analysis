@@ -1,6 +1,5 @@
 import logging
 
-import h5py
 import pandas as pd
 
 from .decode import (
@@ -10,6 +9,7 @@ from .decode import (
     load_registry,
 )
 from .enrich import enrich_with_people, enrich_with_venues
+from .introspect import dataset_field_names
 from .io import load_people_lookup, load_raw_table, load_venues_lookup
 
 logger = logging.getLogger(__name__)
@@ -43,15 +43,6 @@ def _decoded_column_name(id_column: str) -> str:
     if id_column.endswith("_id"):
         return id_column[: -len("_id")]
     return id_column
-
-
-def _peek_field_names(path: str, dataset_path: str):
-    # Header-only read of the compound dtype so we can validate/classify
-    # requested column names without loading any row data.
-    with h5py.File(path, "r") as fh:
-        if dataset_path not in fh:
-            return None
-        return fh[dataset_path].dtype.names
 
 
 def _resolve_columns(columns, registry_columns, raw_fields):
@@ -134,7 +125,7 @@ def load_decoded_events(
         raw_columns = None
         registries_to_decode = registry_columns
     else:
-        raw_fields = _peek_field_names(path, dataset_path)
+        raw_fields = dataset_field_names(path, dataset_path)
         if raw_fields is None:
             return None
         raw_columns, registries_to_decode = _resolve_columns(
