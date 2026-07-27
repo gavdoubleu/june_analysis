@@ -14,7 +14,7 @@ from core.animations_core.build_animation.raster import (
     accumulate_to_grid,
     cell_rate_grid,
     compute_cell_indices,
-    metric_grid,
+    metric_grids,
 )
 
 # A 2x2 grid over a 0..100 x 0..100 UTM box; two east/north points that fall in
@@ -50,29 +50,45 @@ def test_cell_rate_is_counts_over_population_zero_pop_is_nan():
     assert np.isnan(rate[1, 1])
 
 
-def test_metric_grid_rate_re_derives_from_crowded_cell():
+def test_metric_grids_rate_re_derives_from_crowded_cell():
     # Two units in one cell: counts [5, 3], pop [1000, 2000]. The cell rate must
     # be (5+3)/(1000+2000)*1e5, NOT rate1+rate2 (which crowding would inflate).
     eastings = np.array([25.0, 30.0])
     northings = np.array([25.0, 30.0])
-    counts = np.array([5.0, 3.0])
+    counts = np.array([[5.0, 3.0]])  # one bin
     population = np.array([1000.0, 2000.0])
-    grid = metric_grid(
+    grids = metric_grids(
         eastings, northings, counts, population, UTM_BBOX, GRID_SHAPE,
         metric="rate_per_100k",
     )
-    assert np.isclose(grid[1, 0], 8.0 / 3000.0 * 1e5)
+    assert np.isclose(grids[0][1, 0], 8.0 / 3000.0 * 1e5)
 
 
-def test_metric_grid_count_sums_counts_empty_is_nan():
+def test_metric_grids_count_sums_counts_empty_is_nan():
     eastings = np.array([25.0, 30.0])
     northings = np.array([25.0, 30.0])
-    counts = np.array([5.0, 3.0])
+    counts = np.array([[5.0, 3.0]])  # one bin
     population = np.array([1000.0, 2000.0])
-    grid = metric_grid(
+    grids = metric_grids(
         eastings, northings, counts, population, UTM_BBOX, GRID_SHAPE,
         metric="count",
     )
-    assert grid[1, 0] == 8.0
+    assert grids[0][1, 0] == 8.0
     # empty cells carry no events -> NaN so the alpha ramp leaves them transparent.
-    assert np.isnan(grid[0, 0])
+    assert np.isnan(grids[0][0, 0])
+
+
+def test_metric_grids_shares_invariants_across_bins():
+    # Two bins, same geometry/population: each bin reads strictly its own counts,
+    # and the shared denominator is applied identically.
+    eastings = np.array([25.0, 30.0])
+    northings = np.array([25.0, 30.0])
+    counts = np.array([[5.0, 3.0], [1.0, 1.0]])  # two bins
+    population = np.array([1000.0, 2000.0])
+    grids = metric_grids(
+        eastings, northings, counts, population, UTM_BBOX, GRID_SHAPE,
+        metric="rate_per_100k",
+    )
+    assert len(grids) == 2
+    assert np.isclose(grids[0][1, 0], 8.0 / 3000.0 * 1e5)
+    assert np.isclose(grids[1][1, 0], 2.0 / 3000.0 * 1e5)

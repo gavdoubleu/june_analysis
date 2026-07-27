@@ -101,7 +101,7 @@ def cell_rate_grid(
     return rate
 
 
-def metric_grid(
+def metric_grids(
     eastings: np.ndarray,
     northings: np.ndarray,
     counts: np.ndarray,
@@ -110,28 +110,40 @@ def metric_grid(
     grid_shape: tuple[int, int],
     *,
     metric: str = "rate_per_100k",
-) -> np.ndarray:
-    """One frame's cell grid for ``metric`` ('rate_per_100k' or 'count').
+) -> list[np.ndarray]:
+    """One cell grid per bin for ``metric`` ('rate_per_100k' or 'count').
 
-    ``counts`` / ``population`` are per-unit vectors aligned to the centroid
-    arrays. For rate, counts and population are accumulated separately then
-    divided (density-independent). For count, empty cells are NaN so they render
+    ``counts`` is the dense ``(n_bins, n_units)`` matrix; ``population`` and the
+    centroid arrays are per-unit and *fixed across bins*. The bin-invariant work —
+    cell indexing and the denominator grid (population for rate, occupancy for
+    count) — is done once, and only the per-bin counts accumulation varies. Grids
+    are raw (unsmoothed), aligned to ``counts`` rows.
+
+    For rate, counts and population are accumulated separately then divided
+    (density-independent). For count, empty cells are NaN so they render
     transparent like the rate path (rather than a solid floor of zeros).
     """
     flat = compute_cell_indices(eastings, northings, utm_bbox, grid_shape)
-    counts_grid = accumulate_to_grid(flat, counts, grid_shape)
 
     if metric == "count":
         occupied = accumulate_to_grid(
-            flat, np.ones_like(counts, dtype="float64"), grid_shape
+            flat, np.ones(flat.shape[0], dtype="float64"), grid_shape
         )
-        grid = counts_grid.copy()
-        grid[occupied == 0] = np.nan
-        return grid
+        grids = []
+        for counts_row in counts:
+            grid = accumulate_to_grid(flat, counts_row, grid_shape)
+            grid[occupied == 0] = np.nan
+            grids.append(grid)
+        return grids
 
     if metric == "rate_per_100k":
         population_grid = accumulate_to_grid(flat, population, grid_shape)
-        return cell_rate_grid(counts_grid, population_grid)
+        return [
+            cell_rate_grid(
+                accumulate_to_grid(flat, counts_row, grid_shape), population_grid
+            )
+            for counts_row in counts
+        ]
 
     raise ValueError(
         f"Unknown metric {metric!r}; expected 'rate_per_100k' or 'count'."

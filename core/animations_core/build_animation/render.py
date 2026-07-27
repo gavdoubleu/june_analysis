@@ -30,7 +30,7 @@ import numpy as np
 from ..config import RenderConfig
 from ..visual_settings.ramp import global_value_range
 from .projection import utm_epsg, wgs84_to_utm
-from .raster import metric_grid, smooth_grid, utm_grid_geometry
+from .raster import metric_grids, smooth_grid, utm_grid_geometry
 
 _METRIC_LABELS = {"rate_per_100k": "rate per 100k", "count": "count"}
 
@@ -92,21 +92,16 @@ def prepare(aggregate, world, config: RenderConfig) -> Prepared:
         utm_bbox, config.figure_height, config.grid_resolution
     )
 
-    smoothed_grids = [
-        smooth_grid(
-            metric_grid(
-                eastings,
-                northings,
-                aggregate.counts[bin_index],
-                population_vector,
-                utm_bbox,
-                grid_shape,
-                metric=config.metric,
-            ),
-            config.sigma,
-        )
-        for bin_index in range(aggregate.counts.shape[0])
-    ]
+    grids = metric_grids(
+        eastings,
+        northings,
+        aggregate.counts,
+        population_vector,
+        utm_bbox,
+        grid_shape,
+        metric=config.metric,
+    )
+    smoothed_grids = [smooth_grid(grid, config.sigma) for grid in grids]
 
     vmin, vmax = global_value_range(smoothed_grids)
     frame_labels = _frame_labels(aggregate.bin_starts, config.start_date)
