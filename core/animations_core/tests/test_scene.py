@@ -10,6 +10,7 @@ Basemap fetch is stubbed to ``None`` throughout so the tests stay offline and
 deterministic (the fetch/cache path is exercised by ``test_basemap``).
 """
 
+import dataclasses
 from datetime import date
 
 import numpy as np
@@ -119,6 +120,18 @@ def test_colourbar_uses_the_global_scale():
     scene = Scene(prepared, RenderConfig())
     try:
         assert scene._mappable.get_clim() == (prepared.vmin, prepared.vmax)
+    finally:
+        _close(scene)
+
+
+# --- 5b: colourbar label reads prepared.metric_label ---------------------
+def test_colourbar_label_reads_prepared_metric_label():
+    # Sentinel label distinguishes reading the derived field from re-deriving
+    # off config.metric (which would map to "rate per 100k").
+    prepared = dataclasses.replace(_prepared(), metric_label="SENTINEL")
+    scene = Scene(prepared, RenderConfig())
+    try:
+        assert scene.figure.axes[1].get_ylabel() == "SENTINEL"
     finally:
         _close(scene)
 

@@ -16,7 +16,6 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from . import layout as layout_module
-from .render import _METRIC_LABELS
 
 if TYPE_CHECKING:
     from ..config import RenderConfig
@@ -52,14 +51,13 @@ class Scene:
             prepared.utm_bbox,
             self._layout.data_crs,
         )
-        label = _METRIC_LABELS.get(config.metric, config.metric)
         self._mappable = layout_module.add_colourbar(
             self._layout.figure,
             self._layout.colourbar_axis,
             cmap,
             prepared.vmin,
             prepared.vmax,
-            label=label,
+            label=prepared.metric_label,
         )
 
     @property

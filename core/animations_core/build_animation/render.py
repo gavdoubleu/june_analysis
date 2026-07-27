@@ -53,6 +53,7 @@ class Prepared:
     grid_shape: tuple[int, int]
     vmin: float
     vmax: float
+    metric_label: str
     config: Any
 
     def write(self, path: str, format: str | None = None) -> None:
@@ -198,6 +199,7 @@ def prepare(aggregate, world, config: RenderConfig) -> Prepared:
 
     vmin, vmax = global_value_range(smoothed_grids)
     frame_labels = _frame_labels(aggregate.bin_starts, config.start_date)
+    metric_label = _METRIC_LABELS.get(config.metric, config.metric)
 
     return Prepared(
         smoothed_grids=smoothed_grids,
@@ -208,6 +210,7 @@ def prepare(aggregate, world, config: RenderConfig) -> Prepared:
         grid_shape=grid_shape,
         vmin=vmin,
         vmax=vmax,
+        metric_label=metric_label,
         config=config,
     )
 

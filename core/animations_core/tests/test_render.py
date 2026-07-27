@@ -76,6 +76,17 @@ def test_prepare_yields_one_grid_per_bin_with_global_scale():
     assert shapes == {prepared.grid_shape}
 
 
+def test_prepare_bakes_the_metric_label():
+    rate = render.prepare(
+        _aggregate(n_bins=2), _world(), RenderConfig(metric="rate_per_100k")
+    )
+    assert rate.metric_label == "rate per 100k"
+    count = render.prepare(
+        _aggregate(n_bins=2), _world(), RenderConfig(metric="count")
+    )
+    assert count.metric_label == "count"
+
+
 def test_prepare_dates_use_start_date_when_given():
     aggregate = _aggregate(n_bins=2)
     config = RenderConfig(start_date=date(2020, 3, 1))
