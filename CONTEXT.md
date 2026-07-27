@@ -29,6 +29,12 @@ An addressable geographic area in the world hierarchy (identified by
 carry a `geo_unit_id`, so aggregation keys on it **without needing coordinates** —
 this is what makes the events-only path possible.
 
+**Decoded event table**:
+A single **Event type**'s rows with **Registry** codes resolved to labels (via
+`decode_registry_column`) but *without* the **Lookup table** people/venue joins of
+an **Enriched event table** — the light extraction path. Produced by
+`load_decoded_events`; a **Consumer** bins/plots it with ordinary pandas.
+
 **Aggregate**:
 A time-binned per-**Geo unit** summary of events — counts, or rate-per-100k once
 population is known. Produced by `core/aggregate`, keyed on `geo_unit_id`.

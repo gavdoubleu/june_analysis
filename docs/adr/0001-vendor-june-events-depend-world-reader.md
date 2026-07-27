@@ -35,3 +35,6 @@ handling.
   (Phase 3) can be built.
 - The `introspect` rename means any external `june_events.inspect` import must be
   updated to `june_events.introspect`.
+- `load_enriched.py` is now a deliberate divergence point from the JUNE2 copy: the
+  `load_decoded_events` / `load_enriched_events` split lives only in the vendored
+  copy. Re-vendor by **merging**, not overwriting, so the split is preserved.

@@ -33,6 +33,43 @@ def test_load_raw_table_returns_none_and_warns_for_absent_dataset_path(tmp_path,
     assert "lookups/people_properties" in caplog.text
 
 
+def test_load_raw_table_projects_requested_columns(tmp_path):
+    import numpy as np
+
+    path = tmp_path / "projected_simulation_events.h5"
+    dtype = [("person_id", "<i4"), ("venue_id", "<i4"), ("time", "<f8")]
+    rows = np.array([(i, i * 10, float(i)) for i in range(4)], dtype=dtype)
+    with h5py.File(path, "w") as fh:
+        fh.create_dataset("events/deaths", data=rows)
+
+    projected = load_raw_table(str(path), "events/deaths", columns=["time"])
+
+    assert list(projected.columns) == ["time"]
+    assert list(projected["time"]) == [0.0, 1.0, 2.0, 3.0]
+
+
+def test_load_raw_table_projects_columns_in_chunked_path(tmp_path):
+    import numpy as np
+
+    path = tmp_path / "projected_chunked_simulation_events.h5"
+    dtype = [("person_id", "<i4"), ("venue_id", "<i4"), ("time", "<f8")]
+    rows = np.array([(i, i * 10, float(i)) for i in range(10)], dtype=dtype)
+    with h5py.File(path, "w") as fh:
+        fh.create_dataset("events/deaths", data=rows)
+
+    projected = load_raw_table(
+        str(path),
+        "events/deaths",
+        columns=["person_id", "time"],
+        chunk_threshold_bytes=1,
+        chunk_rows=3,
+    )
+
+    assert list(projected.columns) == ["person_id", "time"]
+    assert len(projected) == 10
+    assert list(projected["person_id"]) == list(range(10))
+
+
 def test_load_raw_table_chunked_read_matches_single_read(tmp_path):
     import numpy as np
 
