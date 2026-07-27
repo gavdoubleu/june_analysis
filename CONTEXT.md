@@ -17,6 +17,13 @@ platform-level terms below.
 input: on its own it supports epidemic curves, per-geo tables, symptom-state
 plots. Read by `core/load_data/june_events`.
 
+**SimulationEvents**:
+The reader handle to one run's **Events file** — exposes its available **Event
+type**s (with row counts) and loads them, decoded or enriched. Owns the light
+details Consumers otherwise repeat (the `events/` prefix, path coercion). Bound to
+one file; events-only — the World file is an input the run *consumes*, so it stays
+outside this handle.
+
 **World file**:
 `world_state.h5` — geography, population, venues for a run. Optional. Read (via
 the installed `world_reader` dependency) by `core/load_data/world`. Supplies the
