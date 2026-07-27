@@ -7,8 +7,8 @@ geometry. It infers missing coordinates from the World, then *hard-errors* if an
 unit carrying events still has no coordinate (the resolved policy — a map cannot
 silently drop located events).
 
-The prepare() half is pure data (numpy / pyproj / scipy), so it is tested without
-matplotlib. The draw half needs matplotlib + cartopy and is skipped when absent.
+``prepare()`` is pure data (numpy / pyproj / scipy), so it is tested without
+matplotlib; the render half now lives on :class:`~.scene.Scene` (``test_scene``).
 """
 
 from datetime import date
@@ -101,6 +101,12 @@ def test_prepare_labels_by_day_number_without_start_date():
     assert prepared.frame_labels[0] != prepared.frame_labels[1]
 
 
+def test_prepared_is_pure_data_without_config():
+    # Prepared holds no render intent — the config blob does not ride along.
+    prepared = render.prepare(_aggregate(n_bins=2), _world(), RenderConfig())
+    assert not hasattr(prepared, "config")
+
+
 def test_prepare_infers_then_hard_errors_on_uncoordinated_unit():
     aggregate = _aggregate(n_bins=2)
     # Unit 20 has no coordinate and none inferable -> hard error.
@@ -121,44 +127,3 @@ def test_prepare_inference_supplies_missing_coordinate():
     )
     prepared = render.prepare(aggregate, world, RenderConfig())
     assert len(prepared.smoothed_grids) == 2  # inference filled the gap
-
-
-def test_config_projection_sets_the_axis_crs():
-    pytest.importorskip("matplotlib")
-    import cartopy.crs as ccrs
-    import matplotlib
-
-    matplotlib.use("Agg")
-
-    config = RenderConfig(projection="platecarree")
-    prepared = render.prepare(_aggregate(n_bins=2), _world(), config)
-    scene, _mappable = prepared.build_layout()
-    try:
-        assert isinstance(scene.map_axis.projection, ccrs.PlateCarree)
-    finally:
-        import matplotlib.pyplot as plt
-
-        plt.close(scene.figure)
-
-
-def test_draw_frame_updates_heatmap_and_date_ticker():
-    pytest.importorskip("matplotlib")
-    pytest.importorskip("cartopy")
-    import matplotlib
-
-    matplotlib.use("Agg")
-
-    prepared = render.prepare(_aggregate(n_bins=2), _world(), RenderConfig())
-    scene, mappable = prepared.build_layout()
-    try:
-        prepared.draw_frame(scene, mappable, 0)
-        assert len(scene.map_axis.images) >= 1  # heatmap layer present
-        assert scene.date_text.get_text() == prepared.frame_labels[0]
-        first_image = scene.heatmap_image
-        prepared.draw_frame(scene, mappable, 1)
-        # Same artist reused across frames (updated, not re-added).
-        assert scene.heatmap_image is first_image
-    finally:
-        import matplotlib.pyplot as plt
-
-        plt.close(scene.figure)

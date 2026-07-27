@@ -1,8 +1,10 @@
-"""Output-format registry for the animation (ADR-0007).
+"""Output-format registry — the animation's pure sink (ADR-0007).
 
-A :class:`Prepared` is format-independent; the concrete encoders live here, each
-registered under an extension via :func:`register` (mirroring the projection
-``@register`` idea). :func:`write_animation` resolves the format — explicit
+Encoders are driven entirely by an :class:`AnimationSource` bundle (figure +
+frame count + a ``draw`` callback + fps/dpi); they know nothing of ``Scene`` or
+``Prepared``, so the dependency runs one way ``Scene -> writers -> ∅``. Each
+concrete encoder registers under an extension via :func:`register` (mirroring the
+projection ``@register`` idea); :func:`encode` resolves the format — explicit
 argument, else guessed from the path extension — and dispatches:
 
 - ``mp4`` -> ``FFMpegWriter`` (needs ffmpeg on the system PATH),
@@ -10,20 +12,18 @@ argument, else guessed from the path extension — and dispatches:
   GIF plays once (matplotlib hardcodes infinite looping),
 - ``png`` -> a single static frame (the final bin), for a still preview.
 
-Every encoder builds the layout + animation from the ``Prepared`` and closes the
-figure afterwards. matplotlib / Pillow are lazy-imported (ADR-0002), so the
-registry is defined without importing any render dependency.
+Frames stream via ``FuncAnimation`` — ``draw`` is called one index at a time and
+each frame flushed to disk, never all materialised in memory. matplotlib /
+Pillow are lazy-imported (ADR-0002), so the registry is defined without importing
+any render dependency.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Callable
+from typing import Any, Callable
 
-if TYPE_CHECKING:
-    from .render import Prepared
-
-_WRITERS: dict[str, Callable[[Any, str], None]] = {}
+_WRITERS: dict[str, Callable[["AnimationSource", str], None]] = {}
 
 
 @dataclass(frozen=True)
@@ -74,21 +74,16 @@ def resolve_format(path: str, fmt: str | None) -> str:
     return resolved
 
 
-def write_animation(prepared: Prepared, path: str, fmt: str | None = None) -> None:
-    """Encode ``prepared`` to ``path`` using the resolved writer."""
-    _WRITERS[resolve_format(path, fmt)](prepared, path)
-
-
 def encode(source: AnimationSource, path: str, fmt: str | None = None) -> None:
-    """Encode ``source`` to ``path`` using the resolved source-based encoder.
+    """Encode ``source`` to ``path`` using the resolved encoder.
 
     The pure sink: driven entirely by the :class:`AnimationSource` bundle, with
     no reference back to ``Scene`` or ``Prepared``.
     """
-    _SOURCE_ENCODERS[resolve_format(path, fmt)](source, path)
+    _WRITERS[resolve_format(path, fmt)](source, path)
 
 
-def _animation_from_source(source: AnimationSource):
+def _build_animation(source: AnimationSource):
     """``FuncAnimation`` looping ``source.draw`` over ``source.frame_count``.
 
     Streams one frame at a time (``blit=False``); the writer flushes each to
@@ -104,20 +99,22 @@ def _animation_from_source(source: AnimationSource):
     )
 
 
+@register("mp4")
 def _encode_mp4(source: AnimationSource, path: str) -> None:
     from matplotlib.animation import FFMpegWriter
 
-    animation = _animation_from_source(source)
+    animation = _build_animation(source)
     try:
         animation.save(path, writer=FFMpegWriter(fps=source.fps), dpi=source.dpi)
     finally:
         _close(source.figure)
 
 
+@register("gif")
 def _encode_gif(source: AnimationSource, path: str) -> None:
     from matplotlib.animation import PillowWriter
 
-    animation = _animation_from_source(source)
+    animation = _build_animation(source)
     try:
         animation.save(path, writer=PillowWriter(fps=source.fps), dpi=source.dpi)
     finally:
@@ -125,6 +122,7 @@ def _encode_gif(source: AnimationSource, path: str) -> None:
     _set_gif_play_once(path)
 
 
+@register("png")
 def _encode_png(source: AnimationSource, path: str) -> None:
     try:
         source.draw(source.frame_count - 1)
@@ -133,77 +131,10 @@ def _encode_png(source: AnimationSource, path: str) -> None:
         _close(source.figure)
 
 
-_SOURCE_ENCODERS: dict[str, Callable[[AnimationSource, str], None]] = {
-    "mp4": _encode_mp4,
-    "gif": _encode_gif,
-    "png": _encode_png,
-}
-
-
-def _build_animation(prepared: Prepared):
-    """``(scene, animation)`` looping :meth:`Prepared.draw_frame` over all bins."""
-    from matplotlib.animation import FuncAnimation
-
-    scene, mappable = prepared.build_layout()
-
-    def update(index: int):
-        prepared.draw_frame(scene, mappable, index)
-        return (scene.heatmap_image, scene.date_text)
-
-    animation = FuncAnimation(
-        scene.figure,
-        update,
-        frames=len(prepared.smoothed_grids),
-        blit=False,
-    )
-    return scene, animation
-
-
 def _close(figure) -> None:
     import matplotlib.pyplot as plt
 
     plt.close(figure)
-
-
-@register("mp4")
-def _write_mp4(prepared: Prepared, path: str) -> None:
-    from matplotlib.animation import FFMpegWriter
-
-    scene, animation = _build_animation(prepared)
-    try:
-        animation.save(
-            path,
-            writer=FFMpegWriter(fps=prepared.config.fps),
-            dpi=prepared.config.dpi,
-        )
-    finally:
-        _close(scene.figure)
-
-
-@register("gif")
-def _write_gif(prepared: Prepared, path: str) -> None:
-    from matplotlib.animation import PillowWriter
-
-    scene, animation = _build_animation(prepared)
-    try:
-        animation.save(
-            path,
-            writer=PillowWriter(fps=prepared.config.fps),
-            dpi=prepared.config.dpi,
-        )
-    finally:
-        _close(scene.figure)
-    _set_gif_play_once(path)
-
-
-@register("png")
-def _write_png(prepared: Prepared, path: str) -> None:
-    scene, mappable = prepared.build_layout()
-    try:
-        prepared.draw_frame(scene, mappable, len(prepared.smoothed_grids) - 1)
-        scene.figure.savefig(path, dpi=prepared.config.dpi)
-    finally:
-        _close(scene.figure)
 
 
 def _strip_netscape_loop(data: bytes) -> bytes:
