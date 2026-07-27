@@ -17,7 +17,10 @@ registry is defined without importing any render dependency.
 
 from __future__ import annotations
 
-from typing import Any, Callable
+from typing import TYPE_CHECKING, Any, Callable
+
+if TYPE_CHECKING:
+    from .render import Prepared
 
 _WRITERS: dict[str, Callable[[Any, str], None]] = {}
 
@@ -54,12 +57,12 @@ def resolve_format(path: str, fmt: str | None) -> str:
     return resolved
 
 
-def write_animation(prepared: Any, path: str, fmt: str | None = None) -> None:
+def write_animation(prepared: Prepared, path: str, fmt: str | None = None) -> None:
     """Encode ``prepared`` to ``path`` using the resolved writer."""
     _WRITERS[resolve_format(path, fmt)](prepared, path)
 
 
-def _build_animation(prepared: Any):
+def _build_animation(prepared: Prepared):
     """``(scene, animation)`` looping :meth:`Prepared.draw_frame` over all bins."""
     from matplotlib.animation import FuncAnimation
 
@@ -85,7 +88,7 @@ def _close(figure) -> None:
 
 
 @register("mp4")
-def _write_mp4(prepared: Any, path: str) -> None:
+def _write_mp4(prepared: Prepared, path: str) -> None:
     from matplotlib.animation import FFMpegWriter
 
     scene, animation = _build_animation(prepared)
@@ -100,7 +103,7 @@ def _write_mp4(prepared: Any, path: str) -> None:
 
 
 @register("gif")
-def _write_gif(prepared: Any, path: str) -> None:
+def _write_gif(prepared: Prepared, path: str) -> None:
     from matplotlib.animation import PillowWriter
 
     scene, animation = _build_animation(prepared)
@@ -116,7 +119,7 @@ def _write_gif(prepared: Any, path: str) -> None:
 
 
 @register("png")
-def _write_png(prepared: Any, path: str) -> None:
+def _write_png(prepared: Prepared, path: str) -> None:
     scene, mappable = prepared.build_layout()
     try:
         prepared.draw_frame(scene, mappable, len(prepared.smoothed_grids) - 1)

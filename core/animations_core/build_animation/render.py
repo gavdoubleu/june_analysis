@@ -28,6 +28,7 @@ from typing import Any
 
 import numpy as np
 
+from ..config import RenderConfig
 from ..visual_settings.ramp import global_value_range
 from . import layout as layout_module
 from .projection import utm_epsg, wgs84_to_utm
@@ -144,7 +145,7 @@ class Prepared:
         )
 
 
-def prepare(aggregate, world, config) -> Prepared:
+def prepare(aggregate, world, config: RenderConfig) -> Prepared:
     """Build a :class:`Prepared` from a dense Aggregate + World + RenderConfig.
 
     Resolves coordinates (inferring then hard-erroring on gaps), projects to UTM,
