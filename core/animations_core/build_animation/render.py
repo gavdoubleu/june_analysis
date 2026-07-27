@@ -54,6 +54,16 @@ class Prepared:
     vmax: float
     config: Any
 
+    def write(self, path: str, format: str | None = None) -> None:
+        """Encode the animation to ``path`` (format guessed from the extension).
+
+        Thin delegate to the writer registry (:mod:`writers`); ``format`` keys a
+        writer explicitly, otherwise the path extension does.
+        """
+        from . import writers
+
+        writers.write_animation(self, path, format)
+
     def build_layout(self):
         """Build the static scene (map + basemap + colourbar) for this render.
 

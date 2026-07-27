@@ -6,10 +6,11 @@ Consumes a dense ``core.aggregate.Aggregate`` + a ``core.load_data.world.World``
 pillow, ffmpeg) are lazy-imported inside functions, so ``import core`` succeeds
 with them absent (ADR-0002).
 
-Public surface: :class:`RenderConfig` and (added as the pipeline lands)
-``prepare`` -> ``Prepared.write``.
+Public surface: :class:`RenderConfig`, :func:`prepare` and the ``Prepared`` it
+returns (``prepare(aggregate, world, config).write(path)``).
 """
 
+from .build_animation.render import Prepared, prepare
 from .config import RenderConfig
 
-__all__ = ["RenderConfig"]
+__all__ = ["Prepared", "RenderConfig", "prepare"]
