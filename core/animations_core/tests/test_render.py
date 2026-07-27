@@ -127,3 +127,54 @@ def test_prepare_inference_supplies_missing_coordinate():
     )
     prepared = render.prepare(aggregate, world, RenderConfig())
     assert len(prepared.smoothed_grids) == 2  # inference filled the gap
+
+
+def test_bbox_margin_keeps_every_unit_inside_the_grid():
+    # Raw min/max put the south/east-most units on the boundary, where they
+    # floor to row==height / col==width and are discarded. The margin fixes that.
+    from core.animations_core.build_animation.raster import compute_cell_indices
+
+    eastings = np.array([0.0, 1000.0])
+    northings = np.array([0.0, 1000.0])
+    bbox = render._bounding_box(eastings, northings)
+    flat = compute_cell_indices(eastings, northings, bbox, grid_shape=(4, 4))
+    assert np.all(flat >= 0)  # no unit dropped to -1
+
+
+def test_prepare_hard_errors_on_unit_with_events_but_no_population():
+    aggregate = _aggregate(n_bins=2)  # both units carry events
+    world = _FakeWorld(
+        coords={10: (51.5, -0.1), 20: (51.6, -0.2)},
+        populations={10: 2000},  # unit 20 unpopulated
+    )
+    with pytest.raises(ValueError, match="population"):
+        render.prepare(aggregate, world, RenderConfig(metric="rate_per_100k"))
+
+
+def test_prepare_count_metric_tolerates_missing_population():
+    aggregate = _aggregate(n_bins=2)
+    world = _FakeWorld(
+        coords={10: (51.5, -0.1), 20: (51.6, -0.2)},
+        populations={10: 2000},  # count metric ignores population
+    )
+    prepared = render.prepare(aggregate, world, RenderConfig(metric="count"))
+    assert len(prepared.smoothed_grids) == 2
+
+
+def test_sub_day_bins_get_distinct_labels():
+    # days_per_bin=0.5 -> bin_starts [0.0, 0.5]; int() truncation collapsed both.
+    aggregate = _aggregate(n_bins=2)
+    aggregate = Aggregate(
+        counts=aggregate.counts,
+        geo_unit_ids=aggregate.geo_unit_ids,
+        bin_starts=np.array([0.0, 0.5]),
+        days_per_bin=0.5,
+        event_type="infection",
+    )
+    day = render.prepare(aggregate, _world(), RenderConfig())
+    assert day.frame_labels == ["Day 0", "Day 0.5"]
+    dated = render.prepare(
+        aggregate, _world(), RenderConfig(start_date=date(2020, 3, 1))
+    )
+    assert dated.frame_labels[0] != dated.frame_labels[1]
+    assert dated.frame_labels[0] == "2020-03-01"
