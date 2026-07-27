@@ -38,6 +38,7 @@ class Layout:
     colourbar_axis: Any
     date_text: Any
     data_crs: Any
+    heatmap_image: Any = None  # the per-frame layer, created on first draw
 
 
 def _utm_crs(epsg: int):
