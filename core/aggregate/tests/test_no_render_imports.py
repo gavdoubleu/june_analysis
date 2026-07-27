@@ -1,5 +1,6 @@
-"""ADR-0002: no render deps below the core boundary. Importing core.aggregate
-(and exercising it) must not pull in matplotlib / ffmpeg / cartopy."""
+"""ADR-0002: no render deps below the core boundary. Importing core.aggregate /
+core.load_data.geo_events (and exercising them) must not pull in matplotlib /
+ffmpeg / cartopy."""
 
 import subprocess
 import sys
@@ -11,11 +12,11 @@ _PROBE = """
 import sys
 import numpy as np, pandas as pd
 import core.aggregate as agg
+import core.load_data.geo_events  # noqa: F401 — must import render-free too
 
 events = pd.DataFrame({
     "time": [0.1, 1.2, 1.8],
-    "venue_geo_unit_id": [1, 1, 2],
-    "person_geo_unit_id": [2, 2, 1],
+    "geo_unit_id": [1, 1, 2],
 })
 aggregate = agg.aggregate_events(events, event_type="infections")
 agg.epidemic_curve(aggregate)

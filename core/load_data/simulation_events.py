@@ -9,6 +9,7 @@ something it produced, so it stays out of this seam (ADR-0003).
 
 from dataclasses import dataclass
 
+from .geo_events import load_geo_events
 from .june_events import inspect_file, load_decoded_events, load_enriched_events
 
 _EVENTS_PREFIX = "events/"
@@ -63,6 +64,15 @@ class SimulationEvents:
         """Light path — the *Decoded event table* for ``event_type``."""
         return load_decoded_events(
             self._path, self._dataset_path(event_type), columns=columns
+        )
+
+    def geo_events(self, event_type: str, geo_priority=("venue", "person")):
+        """Light geo path — the *Located event table* (``time, geo_unit_id``) for
+        ``event_type``. The cheap feed for ``aggregate_events``: joins only
+        ``geo_unit_id`` from the lookups and coalesces per ``geo_priority``, rather
+        than the full people/venue metadata of ``enriched``."""
+        return load_geo_events(
+            self._path, self._dataset_path(event_type), geo_priority=geo_priority
         )
 
     def enriched(self, event_type: str, with_people: bool = True, with_venues: bool = True):

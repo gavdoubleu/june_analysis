@@ -5,6 +5,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from ..geo_events import load_geo_events
 from ..june_events import load_decoded_events, load_enriched_events
 from ..simulation_events import EventTypeSummary, SimulationEvents
 
@@ -90,11 +91,23 @@ def test_enriched_delegates_and_forwards_toggles(tmp_path):
     )
 
 
+def test_geo_events_delegates_and_forwards_priority(tmp_path):
+    path = _write_file(tmp_path / "events.h5")
+    run = SimulationEvents(path)
+
+    pd.testing.assert_frame_equal(
+        run.geo_events("infections", geo_priority=("person",)),
+        load_geo_events(path, "events/infections", geo_priority=("person",)),
+    )
+
+
 def test_absent_event_type_raises_keyerror_listing_available(tmp_path):
     run = SimulationEvents(_write_file(tmp_path / "events.h5"))
 
     with pytest.raises(KeyError) as excinfo:
         run.events("typo")
+    with pytest.raises(KeyError):
+        run.geo_events("typo")
 
     message = str(excinfo.value)
     assert "typo" in message

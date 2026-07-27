@@ -1,9 +1,11 @@
-"""Time-binned, per-geo-unit aggregation of enriched events (events-only path).
+"""Time-binned, per-geo-unit aggregation of located events (events-only path).
 
-Keys on ``geo_unit_id`` — which enriched events already carry as
-``venue_geo_unit_id`` / ``person_geo_unit_id`` (from the lookup joins) — so it
-runs from a `simulation_events.h5` alone, with no coordinates and no World file
-(ADR-0003). No rendering deps are imported here (ADR-0002).
+Takes a *Located event table* — ``time, geo_unit_id`` — as produced by
+``core/load_data/geo_events`` (`load_geo_events` / `SimulationEvents.geo_events`).
+The venue-vs-person geo resolution lives *there*, behind the extraction seam
+(ADR-0005), so this module keys straight on ``geo_unit_id`` and knows nothing of
+lookup column names. Runs from a `simulation_events.h5` alone, with no coordinates
+and no World file (ADR-0003). No rendering deps are imported here (ADR-0002).
 
 Produces a dense `(n_bins, n_geo)` count `Aggregate`. Turning chosen slices into
 a tidy DataFrame / CSV lives in `tidy.py`, so the fast dense path is never forced
@@ -19,12 +21,6 @@ import numpy as np
 import pandas as pd
 
 from .kernels import count_dense
-
-# Geo-source name -> enriched-events column holding that source's geo unit.
-_GEO_SOURCE_COLUMNS = {
-    "venue": "venue_geo_unit_id",
-    "person": "person_geo_unit_id",
-}
 
 
 @dataclass(frozen=True)
@@ -82,43 +78,24 @@ class Aggregate:
         return rate
 
 
-def _resolve_geo_unit(enriched_events: pd.DataFrame, geo_priority) -> np.ndarray:
-    """Coalesce a single geo_unit_id per row following ``geo_priority``.
-
-    Returns a float array with NaN where no source in the priority resolves a
-    geo unit (those rows are dropped downstream).
-    """
-    resolved = pd.Series(np.nan, index=enriched_events.index, dtype="float64")
-    for source in geo_priority:
-        column = _GEO_SOURCE_COLUMNS.get(source)
-        if column is None:
-            raise ValueError(
-                f"unknown geo source {source!r}; expected one of "
-                f"{sorted(_GEO_SOURCE_COLUMNS)}"
-            )
-        if column not in enriched_events.columns:
-            continue
-        resolved = resolved.fillna(enriched_events[column])
-    return resolved.to_numpy()
-
-
 def aggregate_events(
-    enriched_events: pd.DataFrame,
+    located_events: pd.DataFrame,
     *,
     event_type: str,
     days_per_bin: float = 1.0,
     time_start: float | None = None,
     time_end: float | None = None,
-    geo_priority=("venue", "person"),
     use_numba=None,
 ) -> Aggregate:
-    """Aggregate an enriched-events table into dense per-geo per-bin counts.
+    """Aggregate a *Located event table* (``time, geo_unit_id``) into dense
+    per-geo per-bin counts.
 
-    Rows with no resolvable geo unit (per ``geo_priority``), or falling outside
-    ``[time_start, time_end)``, are dropped.
+    Rows with no geo unit (``NaN`` ``geo_unit_id``, from an unresolved source in
+    ``load_geo_events``), or falling outside ``[time_start, time_end)``, are
+    dropped.
     """
-    times = enriched_events["time"].to_numpy(dtype="float64")
-    geo_units = _resolve_geo_unit(enriched_events, geo_priority)
+    times = located_events["time"].to_numpy(dtype="float64")
+    geo_units = located_events["geo_unit_id"].to_numpy(dtype="float64")
 
     # Default window anchors bins to the day (bin) grid, so day-binned counts
     # align to whole days rather than to the first event's fractional time.

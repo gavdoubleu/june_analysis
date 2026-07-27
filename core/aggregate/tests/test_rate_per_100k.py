@@ -10,8 +10,8 @@ import pytest
 from ..aggregate import aggregate_events
 
 
-def test_rate_per_100k_matches_population(enriched_events_simple):
-    aggregate = aggregate_events(enriched_events_simple, event_type="infection")
+def test_rate_per_100k_matches_population(located_events_simple):
+    aggregate = aggregate_events(located_events_simple, event_type="infection")
     # geo_unit_ids == [10, 20]; counts == [[2, 1], [1, 2]].
     rate = aggregate.rate_per_100k({10: 1000, 20: 2000})
 
@@ -21,9 +21,9 @@ def test_rate_per_100k_matches_population(enriched_events_simple):
 
 
 def test_geo_unit_missing_from_population_yields_nan_column_and_warns(
-    enriched_events_simple, caplog
+    located_events_simple, caplog
 ):
-    aggregate = aggregate_events(enriched_events_simple, event_type="infection")
+    aggregate = aggregate_events(located_events_simple, event_type="infection")
 
     with caplog.at_level("WARNING"):
         rate = aggregate.rate_per_100k({10: 1000})  # geo 20 absent
@@ -34,8 +34,8 @@ def test_geo_unit_missing_from_population_yields_nan_column_and_warns(
     assert "20" in caplog.text and "population" in caplog.text
 
 
-def test_zero_population_yields_nan_not_inf(enriched_events_simple):
-    aggregate = aggregate_events(enriched_events_simple, event_type="infection")
+def test_zero_population_yields_nan_not_inf(located_events_simple):
+    aggregate = aggregate_events(located_events_simple, event_type="infection")
 
     rate = aggregate.rate_per_100k({10: 0, 20: 2000})
 

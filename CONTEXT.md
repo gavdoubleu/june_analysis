@@ -42,10 +42,20 @@ A single **Event type**'s rows with **Registry** codes resolved to labels (via
 an **Enriched event table** — the light extraction path. Produced by
 `load_decoded_events`; a **Consumer** bins/plots it with ordinary pandas.
 
+**Located event table**:
+A **Decoded event table** with a single **Geo unit** resolved per row
+(`geo_unit_id`), obtained by joining *only* the `geo_unit_id` column from the
+people/venue **Lookup table**s and coalescing venue-then-person. The light feed for
+an **Aggregate** — it carries `time, geo_unit_id` and nothing else, so it costs a
+fraction of an **Enriched event table** (which joins the whole people+venue
+metadata). Produced by `load_geo_events` / `SimulationEvents.geo_events`. Sits
+between the **Decoded** and **Enriched event table**s.
+
 **Aggregate**:
 A time-binned per-**Geo unit** summary of events — counts, or rate-per-100k once
-population is known. Produced by `core/aggregate`, keyed on `geo_unit_id`.
-The reusable intermediate every **Consumer** builds on; exportable to CSV.
+population is known. Produced by `core/aggregate` from a **Located event table**,
+keyed on `geo_unit_id`. The reusable intermediate every **Consumer** builds on;
+exportable to CSV.
 
 **Population**:
 The resident count of a **Geo unit**, *subtree-aggregated* — a unit's population

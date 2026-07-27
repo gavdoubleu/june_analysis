@@ -14,7 +14,7 @@ def larger_events():
     n = 5000
     return {
         "time": rng.uniform(0.0, 30.0, n),
-        "venue_geo_unit_id": rng.integers(0, 50, n),
+        "geo_unit_id": rng.integers(0, 50, n),
     }
 
 
