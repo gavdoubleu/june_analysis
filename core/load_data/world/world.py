@@ -1,4 +1,5 @@
-"""Thin wrapper over the installed ``world_reader`` dependency (ADR-0001).
+"""Thin wrapper over the installed ``world_reader`` dependency (MAY-owned,
+installed rather than vendored so fixes flow downstream).
 
 Reads a ``world_state.h5`` (**World file**) and exposes just what the analysis
 platform needs: geo-unit coordinates and resident population per geo unit. It

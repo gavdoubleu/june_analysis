@@ -34,9 +34,9 @@ pip install -r requirements-aggregate.txt                    # optional numba JI
 ```
 
 `world_reader` (for `core/load_data/world`, i.e. maps + rate-per-100k) is an
-installed dependency, not vendored (see
-[docs/adr/0001](docs/adr/0001-vendor-june-events-depend-world-reader.md)). It ships
-inside the MAY2 repo with a minimal packaging shim; install it editable from there:
+installed dependency, not vendored — it is MAY-owned, so installing rather than
+copying lets fixes flow downstream. It ships inside the MAY2 repo with a minimal
+packaging shim; install it editable from there:
 
 ```bash
 pip install -e /path/to/MAY2/may_world_visualiser   # exposes top-level world_reader

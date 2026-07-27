@@ -37,8 +37,8 @@ prefixes, or `_resolve_geo_unit`.
   This is deliberate; do not move it back. Re-aggregating one frame under a
   different priority means re-extracting (cheap now), not re-binning.
 - Placement is `core/load_data` (june_analysis-owned), not vendored `june_events`:
-  the priority is an analysis choice, and ADR-0001 keeps vendored divergence
-  minimal. `load_geo_events` composes the vendored `load_decoded_events` +
+  the priority is an analysis choice, and vendored `june_events` divergence is
+  kept minimal. `load_geo_events` composes the vendored `load_decoded_events` +
   `enrich_with_people/venues` over `geo_unit_id`-projected lookups, using the
   existing `include_properties=False` so no `people_properties` expansion is paid.
 - Breaking signature change to `aggregate_events`; the only consumers are the

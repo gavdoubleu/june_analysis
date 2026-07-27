@@ -8,8 +8,8 @@ does, but only by joining the **entire** people lookup (plus every
 event (venue-then-person priority), returning just ``time, geo_unit_id``.
 
 Owned by ``june_analysis`` (not the vendored ``june_events``) because the
-venue/person priority is an analysis choice (ADR-0001 keeps vendored divergence
-minimal). No render deps are imported here (ADR-0002).
+venue/person priority is an analysis choice, keeping vendored ``june_events``
+divergence minimal. No render deps are imported here (ADR-0002).
 """
 
 from __future__ import annotations
