@@ -47,9 +47,11 @@ rate re-derived from separately-accumulated counts and population.**
 
 ## Consequences
 
-- The engine layers as `projection → raster → ramp/normalisation → layout →
-  render → writers`, each render-free at import (matplotlib/cartopy/pyproj/
-  pillow/scipy lazy-imported — ADR-0002).
+- The engine layers as `projection → raster → ramp → prepare (data) → Scene
+  (render) → writers`: `prepare()` returns render-free `Prepared` data, `Scene`
+  owns all matplotlib/cartopy, and `writers` is a one-way sink fed a heavy-dep-
+  free `AnimationSource` (`Scene → writers → ∅`). Every layer is render-free at
+  import (matplotlib/cartopy/pyproj/pillow/scipy lazy-imported — ADR-0002).
 - **Rate is density-independent by construction**, the property discrete marks
   and naive splatting both lack. `grid_resolution` and `sigma` (config) trade
   spatial detail against smoothness; both are cosmetic, not correctness.
