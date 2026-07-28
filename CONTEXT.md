@@ -104,8 +104,10 @@ density alone, the artefact this re-derivation exists to kill.
 
 **Basemap**:
 The shaded-relief tile a **Frame** sits on, fetched once per `(bbox, zone,
-resolution)` and cached (ArcGIS World_Shaded_Relief, no key). A failed fetch
-degrades to a blank background unless `require_basemap` makes it a hard error.
+resolution)` and cached (ArcGIS World_Shaded_Relief, no key). A failed
+*network/HTTP* fetch degrades to a blank background unless `require_basemap`
+makes it a hard error; any other failure (malformed input, a bad decode)
+always raises.
 
 **Consumer**:
 An application built on `core/` — a driver, notebook, or script that loads,

@@ -8,9 +8,10 @@ with ``bboxSR = imageSR = <epsg>``, so the returned image already fills
 
 Fetches are expensive and identical across re-renders, so each is cached on disk
 keyed by ``hash(bbox, zone, resolution)`` (:func:`basemap_cache_key`); tests and
-repeat runs load the ``.npy`` instead of hitting the network. A failed fetch
-(offline, HTTP error) degrades to ``None`` — the caller renders a blank
-background — unless ``require_basemap`` turns that into a hard error.
+repeat runs load the ``.npy`` instead of hitting the network. A failed
+*network/HTTP* fetch (offline, ESRI error response) degrades to ``None`` — the
+caller renders a blank background — unless ``require_basemap`` turns that into
+a hard error. Any other failure (malformed input, a bad decode) always raises.
 
 ``requests`` and Pillow are lazy-imported inside :func:`_fetch_esri_tile`, so the
 module stays render-free (ADR-0002).
@@ -19,9 +20,12 @@ module stays render-free (ADR-0002).
 from __future__ import annotations
 
 import hashlib
+import logging
 import os
 
 import numpy as np
+
+logger = logging.getLogger(__name__)
 
 _ESRI_EXPORT_URL = (
     "https://server.arcgisonline.com/ArcGIS/rest/services/"
@@ -106,10 +110,14 @@ def load_basemap(
     """RGB basemap array for ``utm_bbox``, from cache or ESRI; ``None`` if blank.
 
     Served from ``cache_dir`` when a matching tile is on disk; otherwise fetched
-    and (if ``cache_dir`` is set) cached. A fetch failure returns ``None`` so the
-    render falls back to a blank background — unless ``require_basemap`` re-raises
-    the error instead.
+    and (if ``cache_dir`` is set) cached. A network/HTTP fetch failure returns
+    ``None`` so the render falls back to a blank background — unless
+    ``require_basemap`` re-raises the error instead. Any other failure (malformed
+    input, a bad decode) always raises, since it signals a real bug rather than
+    an offline condition.
     """
+    import requests
+
     resolution = _tile_resolution(figsize, dpi, oversample)
 
     cache_path = None
@@ -121,9 +129,10 @@ def load_basemap(
 
     try:
         tile = _fetch_esri_tile(utm_bbox, epsg, resolution)
-    except Exception:
+    except requests.exceptions.RequestException as exc:
         if require_basemap:
             raise
+        logger.warning("basemap fetch failed (%s); rendering blank background", exc)
         return None
 
     if cache_path is not None:

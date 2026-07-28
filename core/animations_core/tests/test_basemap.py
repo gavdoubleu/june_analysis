@@ -2,14 +2,16 @@
 
 The basemap is a shaded-relief tile drawn under the heatmap. It is fetched once
 per (bbox, zone, resolution) and cached on disk so re-renders and tests never hit
-the network. When the fetch fails (offline) the render degrades to a blank
-background, unless ``require_basemap`` forces a hard error.
+the network. When the fetch fails with a network/HTTP error (offline) the render
+degrades to a blank background, unless ``require_basemap`` forces a hard error.
+Any other failure (a real bug) always raises.
 
 The fetch itself is monkeypatched here, so these tests never touch ESRI.
 """
 
 import numpy as np
 import pytest
+import requests
 
 from core.animations_core.build_animation import basemap
 
@@ -51,7 +53,7 @@ def test_fetch_result_is_cached_and_reused(tmp_path, monkeypatch):
 
 def test_offline_returns_blank_by_default(monkeypatch):
     def offline(*_args, **_kwargs):
-        raise ConnectionError("no network")
+        raise requests.exceptions.ConnectionError("no network")
 
     monkeypatch.setattr(basemap, "_fetch_esri_tile", offline)
     result = basemap.load_basemap(UTM_BBOX, EPSG, FIGSIZE, DPI)
@@ -60,10 +62,19 @@ def test_offline_returns_blank_by_default(monkeypatch):
 
 def test_offline_raises_when_basemap_required(monkeypatch):
     def offline(*_args, **_kwargs):
-        raise ConnectionError("no network")
+        raise requests.exceptions.ConnectionError("no network")
 
     monkeypatch.setattr(basemap, "_fetch_esri_tile", offline)
     with pytest.raises(Exception):
         basemap.load_basemap(
             UTM_BBOX, EPSG, FIGSIZE, DPI, require_basemap=True
         )
+
+
+def test_non_network_error_always_propagates(monkeypatch):
+    def buggy(*_args, **_kwargs):
+        raise KeyError("west")
+
+    monkeypatch.setattr(basemap, "_fetch_esri_tile", buggy)
+    with pytest.raises(KeyError):
+        basemap.load_basemap(UTM_BBOX, EPSG, FIGSIZE, DPI, require_basemap=False)
