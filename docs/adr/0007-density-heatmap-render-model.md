@@ -66,3 +66,8 @@ rate re-derived from separately-accumulated counts and population.**
   Aggregate bin is unchanged.
 - Basemaps are fetched once per `(bbox, zone, resolution)` and cached; a failed
   fetch degrades to a blank background unless `require_basemap` forces the error.
+- `RenderConfig.cache_dir = None` resolves to a repo-local default
+  (`core/animations_core/.cache/basemaps`, anchored via `__file__` so it doesn't
+  depend on the caller's working directory) rather than disabling the cache.
+  There is deliberately no way to fully turn caching off — nothing needs it, and
+  a `None`-means-disabled reading contradicted the module's own docstring.

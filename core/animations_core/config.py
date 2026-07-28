@@ -13,6 +13,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import date
+from pathlib import Path
+
+_DEFAULT_CACHE_DIR = str(Path(__file__).parent / ".cache" / "basemaps")
 
 
 @dataclass(frozen=True)
@@ -49,4 +52,8 @@ class RenderConfig:
     # --- basemap -----------------------------------------------------------
     background_image: str | None = None  # custom image path (bypasses fetch)
     require_basemap: bool = False  # True -> fetch failure is a hard error
-    cache_dir: str | None = None  # None -> engine picks a default cache location
+    cache_dir: str | None = None  # None -> _DEFAULT_CACHE_DIR (repo-local, no opt-out)
+
+    def __post_init__(self) -> None:
+        if self.cache_dir is None:
+            object.__setattr__(self, "cache_dir", _DEFAULT_CACHE_DIR)
