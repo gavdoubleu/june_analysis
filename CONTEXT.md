@@ -122,6 +122,8 @@ generic defaults (`config_default.yaml`). Plague is a Preset, never the default.
 - A **Consumer** loads an **Events file** (always) and optionally a **World
   file**, builds an **Aggregate**, then renders. Maps additionally require the
   World file's coordinates.
-- **Auto-detection** discovers event types, geo levels/hierarchy, disease states,
-  bbox, UTM zone, population from the files. A **Preset** supplies only what
-  cannot be inferred.
+- **Auto-detection** discovers geo levels/hierarchy, disease states, bbox, UTM
+  zone, population from the files. A **Preset** supplies only what cannot be
+  inferred. Event types are *enumerated* for validation, but **which** one an
+  animation renders is an editorial choice a Preset/config must state, not an
+  inferred fact — one `event_type` per animation (a **Frame** draws one scalar).
