@@ -2,3 +2,4 @@
 # Needs requirements-plotting.txt + requirements-maps.txt.
 imageio-ffmpeg
 pillow
+pyyaml  # animations/ driver reads its --config YAML; core never imports yaml
