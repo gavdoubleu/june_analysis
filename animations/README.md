@@ -57,7 +57,7 @@ inputs:
 
 aggregate:
   event_type:     infections   # required — never guessed
-  days_per_frame: 1            # days per frame; raise for a shorter video
+  days_per_frame: 1            # one frame per day — see "Timing" below
 
 output:
   root:   ${output_root}
@@ -81,7 +81,26 @@ uses `config_default.yaml`.
 
 One file per run: to get mp4 *and* gif, flip `output.format` and run again.
 
-## 5. Restyling (optional)
+## 5. Timing: `days_per_frame` and `fps`
+
+**`days_per_frame` bins, it never skips.** Each frame shows the *sum* of every
+event in its window — `days_per_frame: 7` gives one frame per week showing that
+whole week's events, not "day 1, day 8, day 15". Bins are contiguous and cover
+the run; no event is sampled away. Fractional values (`0.5`) work if the run's
+time resolution supports them.
+
+Two consequences:
+
+- **Wider bins raise the colour scale.** More events per bin ⇒ a higher global
+  maximum. A weekly render is not directly comparable with a daily one.
+- **Playback speed = `days_per_frame ÷ fps` sim-days per second.** Defaults
+  (1 and 2) give 2 sim-days/sec. Set `days_per_frame: 7` and the same `fps: 2`
+  runs 7× faster, at 14 sim-days/sec.
+
+`fps` is an integer, so to slow a weekly render you cannot drop below `fps: 1`.
+Prefer keeping `days_per_frame: 1` and setting `fps` for the pace you want.
+
+## 6. Restyling (optional)
 
 Everything cosmetic goes in an optional `render:` block. All keys optional; set
 only what you want to change.
