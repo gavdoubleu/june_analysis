@@ -187,6 +187,60 @@ def test_map_located_falls_back_from_seed_venue_to_person_geo(tmp_path):
     np.testing.assert_array_equal(located["geo_unit_id"].to_numpy(), [5.0, 200.0])
 
 
+def test_rate_metric_attributes_by_residence_not_venue():
+    # A rate's denominator is resident population, so its numerator must count
+    # residents; venue attribution puts a fair's visitors on its host unit and
+    # yields impossible rates.
+    from ..animate_epidemic_example import default_geo_priority
+
+    assert default_geo_priority("rate_per_100k") == ("person",)
+
+
+def test_count_metric_keeps_venue_attribution():
+    # No denominator, so "where transmission happened" is the useful signal.
+    from ..animate_epidemic_example import default_geo_priority
+
+    assert default_geo_priority("count") == ("venue", "person")
+
+
+def test_config_geo_priority_overrides_the_metric_default():
+    from ..animate_epidemic_example import resolve_geo_priority
+
+    # counts by residence — the configurable case
+    assert resolve_geo_priority({"geo_priority": ["person"]}, "count") == ("person",)
+    # a bare string is accepted alongside a list
+    assert resolve_geo_priority({"geo_priority": "person"}, "count") == ("person",)
+
+
+def test_absent_geo_priority_falls_back_to_metric_default():
+    from ..animate_epidemic_example import resolve_geo_priority
+
+    assert resolve_geo_priority({}, "rate_per_100k") == ("person",)
+    assert resolve_geo_priority({}, "count") == ("venue", "person")
+
+
+def test_unknown_geo_priority_source_is_rejected():
+    from ..animate_epidemic_example import resolve_geo_priority
+
+    with pytest.raises(ValueError, match="geo_priority.*postcode"):
+        resolve_geo_priority({"geo_priority": ["postcode"]}, "count")
+
+
+def test_person_priority_attributes_event_to_residence_not_venue(tmp_path):
+    # person 2 lives in geo 6 but was infected at venue 11 in geo 200: under
+    # person priority the event counts against 6, the unit whose population the
+    # rate divides by.
+    import numpy as np
+
+    from core.load_data.simulation_events import SimulationEvents
+
+    from ..animate_epidemic_example import located_events_for_map
+
+    events = SimulationEvents(_write_events_with_seed_venue(tmp_path / "e.h5"))
+    located = located_events_for_map(events, "infections", ("person",))
+    np.testing.assert_array_equal(located["geo_unit_id"].to_numpy(), [5.0, 6.0])
+
+
 def test_map_located_drops_geo_still_unplaceable(tmp_path):
     # -1 venue with no person source at all -> stays unresolved as NaN (aggregate
     # drops it), never a literal -1 the map cannot place.

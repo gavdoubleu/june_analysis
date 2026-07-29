@@ -27,7 +27,48 @@ _METRICS = ("rate_per_100k", "count")
 _NO_GEOGRAPHY_ID = -1  # geo_unit_id sentinel: seed / foreign-travel, no geography
 
 
-def located_events_for_map(events, event_type):
+_VENUE_THEN_PERSON = ("venue", "person")
+_PERSON_ONLY = ("person",)
+
+
+def default_geo_priority(metric: str):
+    """Which **Geo source** to attribute an event to, given the map's metric.
+
+    ``rate_per_100k`` divides by a Geo unit's *resident* population, so its
+    numerator must count *residents* too — attribute by **person**. Venue
+    attribution counts whoever was at the venue, so a fair or market in a
+    200-person unit accumulates infections from visitors across the world and
+    reports rates of thousands of percent (observed: 119 infections per
+    resident). Residence attribution caps the ratio at 1.0, as it must.
+
+    ``count`` has no denominator, and "where did transmission happen" is the
+    interesting signal, so it keeps **venue**-then-person. Override either
+    default with ``aggregate.geo_priority`` in the config.
+    """
+    return _PERSON_ONLY if metric == "rate_per_100k" else _VENUE_THEN_PERSON
+
+
+def resolve_geo_priority(aggregate_block: dict, metric: str):
+    """Config's ``aggregate.geo_priority``, else the metric's default.
+
+    Accepts a single source (``person``) or a priority list
+    (``[venue, person]``), coalesced in order by ``geo_events``.
+    """
+    requested = aggregate_block.get("geo_priority")
+    if requested is None:
+        return default_geo_priority(metric)
+    if isinstance(requested, str):
+        requested = [requested]
+    unknown = [source for source in requested if source not in _VENUE_THEN_PERSON]
+    if unknown:
+        raise ValueError(
+            f"unknown geo_priority source(s) {unknown}; expected any of "
+            f"{list(_VENUE_THEN_PERSON)}"
+        )
+    return tuple(requested)
+
+
+def located_events_for_map(events, event_type, geo_priority=_VENUE_THEN_PERSON):
     """Located table for animation, with the ``-1`` geo sentinel map-resolved.
 
     In ``core`` a ``geo_unit_id`` of ``-1`` is *meaningful* — an infection seed
@@ -35,13 +76,17 @@ def located_events_for_map(events, event_type):
     it. A map cannot place ``-1``, so **for animation only** we fall back to the
     person's residence geo; any event still unplaceable becomes ``NaN`` (dropped
     by ``aggregate_events``). ``events`` is a :class:`SimulationEvents`.
+
+    ``geo_priority`` picks the **Geo source**(s) — see :func:`default_geo_priority`.
     """
     import numpy as np
 
-    located = events.geo_events(event_type)  # venue-then-person
+    located = events.geo_events(event_type, geo_priority=geo_priority)
     seed = located["geo_unit_id"] == _NO_GEOGRAPHY_ID
-    if seed.any():
-        by_person = events.geo_events(event_type, geo_priority=("person",))
+    # Person residence is the only fallback for a seed venue; pointless (and a
+    # wasted load) when person is already the priority.
+    if seed.any() and tuple(geo_priority) != _PERSON_ONLY:
+        by_person = events.geo_events(event_type, geo_priority=_PERSON_ONLY)
         located.loc[seed, "geo_unit_id"] = by_person.loc[seed, "geo_unit_id"]
     located.loc[located["geo_unit_id"] == _NO_GEOGRAPHY_ID, "geo_unit_id"] = np.nan
     return located
@@ -184,7 +229,13 @@ def run(config: dict) -> str:
 
     events = SimulationEvents(inputs["events"])
     event_type = resolve_event_type(events, aggregate_block)
-    located = located_events_for_map(events, event_type)
+
+    # RenderConfig first: the metric decides how events are attributed to Geo
+    # units, so it must be known before the Aggregate is built (a rate needs
+    # resident-attributed events — see default_geo_priority).
+    render_config = render_config_from(config.get("render"))
+    geo_priority = resolve_geo_priority(aggregate_block, render_config.metric)
+    located = located_events_for_map(events, event_type, geo_priority)
 
     aggregate = aggregate_events(
         located,
@@ -195,7 +246,6 @@ def run(config: dict) -> str:
     )
 
     world = load_world(inputs["world"])
-    render_config = render_config_from(config.get("render"))
 
     output_path = resolve_output_path(output_block, event_type)
     Path(output_path).parent.mkdir(parents=True, exist_ok=True)

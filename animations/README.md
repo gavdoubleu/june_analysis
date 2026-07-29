@@ -100,7 +100,31 @@ Two consequences:
 `fps` is an integer, so to slow a weekly render you cannot drop below `fps: 1`.
 Prefer keeping `days_per_frame: 1` and setting `fps` for the pace you want.
 
-## 6. Restyling (optional)
+## 6. Attribution: which geo unit an event counts against
+
+An event has two candidate **Geo unit**s — the *venue* it happened at, and the
+*person*'s residence. Which you want depends on the metric, so the default
+follows it:
+
+| Metric | Default attribution | Why |
+|---|---|---|
+| `rate_per_100k` | `person` (residence) | denominator is *resident* population, so the numerator must count residents too |
+| `count` | `venue`, then person | no denominator; "where transmission happened" is the signal |
+
+**This matters.** Venue attribution puts a fair's visitors on its host unit: in
+the 1348 medieval run, one 238-resident unit collected 28,520 infections — 119
+per resident, a rate of 11,900,000 per 100k. Residence attribution caps the
+ratio at 1.0, as it must.
+
+Override either default explicitly — e.g. counts by residence:
+
+```yaml
+aggregate:
+  event_type:   infections
+  geo_priority: [person]     # or [venue, person], or a bare: person
+```
+
+## 7. Restyling (optional)
 
 Everything cosmetic goes in an optional `render:` block. All keys optional; set
 only what you want to change.
