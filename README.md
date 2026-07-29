@@ -22,16 +22,18 @@ Core imports nothing from the app folders; apps import core.
 
 ## Install
 
-Split requirements enforce the render-agnostic boundary — install only what a task
-needs. Core alone never requires matplotlib/ffmpeg.
+Three files. Core alone never requires matplotlib/ffmpeg — the render-agnostic
+boundary is enforced by `core/*/tests/test_no_render_imports.py`; these files just
+let you skip installing what you don't need.
 
 ```bash
-pip install -r requirements.txt                              # core: load + aggregate
-pip install -r requirements.txt -r requirements-plotting.txt # + epidemic curves / static plots
-pip install -r requirements-maps.txt                         # + projection + background fetch
-pip install -r requirements-animation.txt                    # + mp4/gif video render
-pip install -r requirements-aggregate.txt                    # optional numba JIT speed-up
+pip install -r requirements.txt                             # core: load + aggregate
+pip install -r requirements.txt -r requirements-render.txt  # + plots, maps, animation
+pip install -r requirements-dev.txt                         # + pytest, to run the tests
 ```
+
+`requirements.txt` also lists optional `numba` (commented out), a JIT speed-up for
+`core/aggregate`, which must run correctly without it.
 
 `world_reader` (for `core/load_data/world`, i.e. maps + rate-per-100k) is an
 installed dependency, not vendored — it is MAY-owned, so installing rather than

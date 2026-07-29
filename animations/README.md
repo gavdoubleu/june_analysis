@@ -11,13 +11,10 @@ artificially — see [ADR-0007](../docs/adr/0007-density-heatmap-render-model.md
 
 ## 1. Install
 
-Animation is the heaviest path — it needs core + plotting + maps + video:
+Animation needs the core plus everything that draws:
 
 ```bash
-pip install -r requirements.txt \
-            -r requirements-plotting.txt \
-            -r requirements-maps.txt \
-            -r requirements-animation.txt
+pip install -r requirements.txt -r requirements-render.txt
 ```
 
 Plus `world_reader`, which reads the World file and is **not on PyPI**. Install

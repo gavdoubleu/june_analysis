@@ -1,0 +1,16 @@
+# Everything that draws: static plots, epidemic curves, maps, animation.
+# Install alongside the core:
+#   pip install -r requirements.txt -r requirements-render.txt
+#
+# Also needed for maps and rate-per-100k: `world_reader` (core/load_data/world).
+# Not on PyPI and its path is machine-specific, so install it editable from the
+# MAY2 packaging shim:
+#   pip install -e /path/to/MAY2/may_world_visualiser
+matplotlib      # all plots + the animation figure
+cartopy         # the map axis
+pyproj          # UTM projection of coordinates
+pillow          # basemap image decode; gif writer
+scipy           # gaussian_filter in raster.smooth_grid — every heatmap needs it
+requests        # ESRI basemap tile fetch
+imageio-ffmpeg  # mp4 encode; ships a bundled ffmpeg binary (tens of MB)
+pyyaml          # the animations/ driver reads its --config YAML

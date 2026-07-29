@@ -1,5 +1,0 @@
-# Optional: video render only (mp4/gif). Doing static maps/curves must NOT need this.
-# Needs requirements-plotting.txt + requirements-maps.txt.
-imageio-ffmpeg
-pillow
-pyyaml  # animations/ driver reads its --config YAML; core never imports yaml
