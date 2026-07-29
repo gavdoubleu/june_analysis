@@ -29,7 +29,8 @@ class RenderConfig:
     metric: str = "rate_per_100k"  # or "count"
 
     # --- colour ------------------------------------------------------------
-    ramp: str = "magma"  # perceptually-uniform, colourblind-safe default
+    ramp: str = "inferno"  # fiery black->red->orange->yellow; still perceptually
+    # uniform and colourblind-safe. Both presets already override magma to this.
     alpha_power: float = 1.0  # <1 faster onset, >1 only-opaque-near-max
 
     # --- spatial grid / smoothing (density heatmap) ------------------------

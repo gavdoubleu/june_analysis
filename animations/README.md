@@ -115,7 +115,7 @@ render:
 | Key | Default | Does |
 |---|---|---|
 | `metric` | `rate_per_100k` | scalar drawn; or `count` |
-| `ramp` | `magma` | matplotlib colour ramp |
+| `ramp` | `inferno` | matplotlib colour ramp (fiery black→red→orange→yellow) |
 | `alpha_power` | `1.0` | `<1` fades in sooner, `>1` only opaque near max |
 | `grid_resolution` | `1.0` | heatmap cells per km — raise for finer detail, slower |
 | `sigma` | `2.0` | Gaussian smoothing, in grid cells |

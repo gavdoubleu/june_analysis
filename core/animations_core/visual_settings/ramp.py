@@ -5,7 +5,7 @@ Two cosmetic concerns, both config-driven (``RenderConfig.ramp`` / ``alpha_power
 - **Global scale** — the colour scale is fixed across every frame (ADR-0006), so
   ``vmin/vmax`` are computed once over all per-frame cell grids, NaN-aware (empty
   cells are NaN and excluded). Floored at zero: the ramp encodes magnitude.
-- **Alpha ramp** — a perceptually-uniform sequential ramp (default ``magma``)
+- **Alpha ramp** — a perceptually-uniform sequential ramp (default ``inferno``)
   whose alpha rises from 0, so low/empty cells fade to transparent and the
   basemap shows through.
 
@@ -34,7 +34,7 @@ def global_value_range(grids) -> tuple[float, float]:
     return 0.0, vmax
 
 
-def build_alpha_ramp(ramp_name: str = "magma", alpha_power: float = 1.0):
+def build_alpha_ramp(ramp_name: str = "inferno", alpha_power: float = 1.0):
     """A ``ListedColormap`` of ``ramp_name`` whose alpha ramps 0 -> 1.
 
     ``alpha_power`` shapes the fade: ``1`` linear, ``<1`` faster onset (low values
