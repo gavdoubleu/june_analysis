@@ -102,7 +102,7 @@ render:
 | `sigma` | `2.0` | Gaussian smoothing, in grid cells |
 | `projection` | auto | axis CRS name; default is the data's own UTM zone |
 | `figure_height` | `8.0` | inches; width follows the bbox aspect |
-| `fps` | `10` | frames per second |
+| `fps` | `2` | frames per second — 2 simulated days/sec at `days_per_frame: 1` |
 | `dpi` | `120` | resolution |
 | `start_date` | none | ISO date, e.g. `1348-06-01`; labels frames with real dates |
 | `title` | none | figure title |

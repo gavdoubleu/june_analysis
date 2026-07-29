@@ -41,7 +41,7 @@ class RenderConfig:
 
     # --- figure / output ---------------------------------------------------
     figure_height: float = 8.0  # inches; width derived from bbox aspect
-    fps: int = 10
+    fps: int = 2  # at the default days_per_frame: 1, two simulated days per second
     dpi: int = 120
     formats: tuple[str, ...] = ("mp4", "gif")
 
