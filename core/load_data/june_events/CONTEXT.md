@@ -1,9 +1,10 @@
 # june_events
 
 Python library for reading `simulation_events.h5`, the event-log output of the
-JUNE2 simulation engine (see [JUNE2 simulation engine](../../docs/CONTEXT.md)).
-Provides functions to load, inspect, decode, and join the file's tables;
-leaves plotting and analysis logic to the caller.
+JUNE2 simulation engine (a separate repo — it has no glossary here). Provides
+functions to load, inspect, decode, and join the file's tables; leaves plotting
+and analysis logic to the caller. For how the wider platform uses this reader,
+see the [june_analysis glossary](../../../CONTEXT.md).
 
 ## Language
 
@@ -147,10 +148,12 @@ defaults the caller can opt out of, not steps the caller assembles.
   *registry index* (uint8). A generic decode/sentinel helper must take the
   sentinel as a parameter rather than hardcoding one.
 - `coordinated_encounters` is deliberately out of scope for this library's
-  current phase (see ADR [0004](../../docs/adr/0004-size-checked-chunking-for-raw-table-loads.md)
-  for why the raw-table loader is chunked at all) — do not add a bare
-  `load_coordinated_encounters()` without first designing the query
-  interface it actually needs.
+  current phase — do not add a bare `load_coordinated_encounters()` without
+  first designing the query interface it actually needs. Sheer size is why
+  `load_raw_table` chunks at all (`io/raw_tables.py`: reads above
+  `chunk_threshold_bytes` are read in `chunk_rows` blocks and concatenated),
+  but chunking a 22GB table into RAM is not a query interface. That decision
+  predates this repo and has no ADR here.
 - The engine also writes an `activities` **Registry** and an `activity_index`
   column, but that column lives on `/lookups/person_activities`
   (`PersonActivityRecord`, `event_types.h`), not on any **Raw event table** —

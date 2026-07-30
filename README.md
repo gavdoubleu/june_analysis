@@ -20,6 +20,11 @@ events_analysis/ APP: notebooks (epidemic curves, static map)              [Phas
 
 Core imports nothing from the app folders; apps import core.
 
+New here? Start with an app, not `core/`:
+[animations/README.md](animations/README.md) to make a map video,
+[events_analysis/README.md](events_analysis/README.md) for curves and per-area
+tables (no World file needed).
+
 ## Install
 
 Three files. Core alone never requires matplotlib/ffmpeg — the render-agnostic
@@ -52,5 +57,5 @@ No `pyproject.toml` yet. Run from the repo root with it on `PYTHONPATH`; import 
 ## Tests
 
 ```bash
-python -m pytest core            # from repo root
+python -m pytest core animations   # from repo root
 ```
