@@ -7,3 +7,4 @@ output/
 .ipynb_checkpoints/
 .cache/
 data/
+tmp/
