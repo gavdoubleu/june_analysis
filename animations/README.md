@@ -202,7 +202,7 @@ render:
 | `grid_resolution` | `1.0` | heatmap cells per km — raise for finer detail, slower |
 | `sigma` | `2.0` | Gaussian smoothing, in grid cells |
 | `projection` | auto | axis CRS name; default is the data's own UTM zone |
-| `figure_height` | `8.0` | inches; width follows the bbox aspect |
+| `figure_height` | `8.0` | inches of *map*; width follows the bbox aspect, plus a thin border and the colourbar strip |
 | `fps` | `2` | frames per second — 2 simulated days/sec at `days_per_frame: 1` |
 | `dpi` | `120` | resolution |
 | `start_date` | none | ISO date, e.g. `1348-06-01`; labels frames with real dates |

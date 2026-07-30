@@ -208,6 +208,16 @@ def _crs_from_name(name: str | None):
     return None if factory is None else factory()
 
 
+# Figure furniture around the map, in inches. ``figsize`` is the *map area*, so
+# the figure is grown by exactly these — no percentage margins, which would both
+# waste space and letterbox the aspect-locked map inside its own axes box.
+_MARGIN_INCHES = 0.06  # blank border; the map has no ticks to leave room for
+_TITLE_INCHES = 0.34  # extra top space, only when a suptitle is drawn
+_COLOURBAR_GAP_INCHES = 0.10  # map edge -> bar
+_COLOURBAR_WIDTH_INCHES = 0.18
+_COLOURBAR_LABEL_INCHES = 0.75  # tick labels + axis label, right of the bar
+
+
 def _create_layout(
     figsize: tuple[float, float],
     dpi: int,
@@ -218,6 +228,12 @@ def _create_layout(
     title: str | None = None,
 ) -> _Layout:
     """Build the figure, map ``GeoAxes``, colourbar axis and date-text artist.
+
+    ``figsize`` sizes the *map area*; the figure is that plus the furniture
+    constants above (margin, colourbar strip, optional title band), and the axes
+    are placed absolutely. So the map keeps the bbox aspect exactly — nothing is
+    lost to letterboxing — and the border stays a fixed thin rim rather than
+    matplotlib's default ~12% subplot margins.
 
     ``epsg`` fixes the data CRS (UTM metres). ``projection`` is the axis CRS: it
     defaults to that same UTM CRS (plain UTM plot), but pass a different cartopy
@@ -231,10 +247,32 @@ def _create_layout(
     data_crs = _utm_crs(epsg)
     axis_projection = projection if projection is not None else data_crs
 
-    figure = Figure(figsize=figsize, dpi=dpi)
-    grid = figure.add_gridspec(1, 2, width_ratios=[1.0, 0.04], wspace=0.02)
-    map_axis = figure.add_subplot(grid[0, 0], projection=axis_projection)
-    colourbar_axis = figure.add_subplot(grid[0, 1])
+    map_width, map_height = figsize
+    colourbar_strip = (
+        _COLOURBAR_GAP_INCHES + _COLOURBAR_WIDTH_INCHES + _COLOURBAR_LABEL_INCHES
+    )
+    title_band = _TITLE_INCHES if title is not None else 0.0
+    figure_width = 2 * _MARGIN_INCHES + map_width + colourbar_strip
+    figure_height = 2 * _MARGIN_INCHES + map_height + title_band
+
+    figure = Figure(figsize=(figure_width, figure_height), dpi=dpi)
+    map_axis = figure.add_axes(
+        (
+            _MARGIN_INCHES / figure_width,
+            _MARGIN_INCHES / figure_height,
+            map_width / figure_width,
+            map_height / figure_height,
+        ),
+        projection=axis_projection,
+    )
+    colourbar_axis = figure.add_axes(
+        (
+            (_MARGIN_INCHES + map_width + _COLOURBAR_GAP_INCHES) / figure_width,
+            _MARGIN_INCHES / figure_height,
+            _COLOURBAR_WIDTH_INCHES / figure_width,
+            map_height / figure_height,
+        )
+    )
 
     map_axis.set_extent(
         (
