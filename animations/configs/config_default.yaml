@@ -25,6 +25,11 @@ render:
   grid_resolution: 1.0   # cells per km
   alpha_power:     0.1   # <1 = low values visible sooner
   fps:             2
+  # basemap_style:   street   # shaded_relief (default) | street | topo | imagery
+                              # street/topo add roads + place names: use only
+                              # where the era warrants it.
+  # basemap_opacity: 0.55     # <1 mutes a busy basemap under the heatmap
+  # attribution:     ""       # override the style's credit line; "" = draw none
 
 output:
   root:   ${output_root}

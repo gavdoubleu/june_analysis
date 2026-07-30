@@ -1,7 +1,8 @@
 """Scene: the stateful render surface built beside the old Prepared path.
 
 ``Scene(prepared, config)`` owns all matplotlib — it builds the static figure
-(map axis + extent, colourbar on the global scale, basemap) in ``__init__``,
+(map axis + extent, colourbar on the global scale, basemap + its credit) in
+``__init__``,
 updates one reused heatmap artist per frame via :meth:`draw_frame`, and encodes
 through :func:`writers.encode` from a heavy-dep-free ``AnimationSource``. The
 render stack is skipped when matplotlib/cartopy are absent (ADR-0002).
@@ -138,6 +139,141 @@ def test_basemap_array_is_drawn_beneath_the_heatmap(monkeypatch):
         assert images[0].zorder == 0  # sits under the heatmap layer
     finally:
         _close(scene)
+
+
+# --- 4c: basemap_opacity reaches the basemap artist ----------------------
+def test_basemap_opacity_mutes_the_basemap_layer(monkeypatch):
+    monkeypatch.setattr(
+        basemap_module,
+        "load_basemap",
+        lambda *a, **k: np.full((8, 6, 3), 100, dtype=np.uint8),
+    )
+    scene = _scene(basemap_opacity=0.55)
+    try:
+        assert scene.figure.axes[0].images[0].get_alpha() == pytest.approx(0.55)
+    finally:
+        _close(scene)
+
+
+# --- 4d: the requested style is what gets fetched ------------------------
+def test_configured_style_is_passed_to_the_fetch(monkeypatch):
+    seen = {}
+
+    def record(*_args, **kwargs):
+        seen["style"] = kwargs.get("style")
+        return None
+
+    monkeypatch.setattr(basemap_module, "load_basemap", record)
+    scene = _scene(basemap_style="topo")
+    try:
+        assert seen["style"] == "topo"
+    finally:
+        _close(scene)
+
+
+# --- 4e: attribution — the licence line on the Frame ---------------------
+def _credit_texts(scene):
+    """Axes texts (the credit plus the date ticker), unwrapped back to one line."""
+    return [" ".join(text.get_text().split()) for text in scene.figure.axes[0].texts]
+
+
+def test_fetched_basemap_is_credited_with_its_style_line(monkeypatch):
+    monkeypatch.setattr(
+        basemap_module,
+        "load_basemap",
+        lambda *a, **k: np.full((8, 6, 3), 100, dtype=np.uint8),
+    )
+    scene = _scene(basemap_style="street")
+    try:
+        expected = basemap_module.BASEMAP_STYLES["street"].attribution
+        assert expected in _credit_texts(scene)
+    finally:
+        _close(scene)
+
+
+def test_long_credit_is_wrapped_within_the_map(monkeypatch):
+    """A ~200-char ESRI credit must not run off the axis and over the colourbar."""
+    monkeypatch.setattr(
+        basemap_module,
+        "load_basemap",
+        lambda *a, **k: np.full((8, 6, 3), 100, dtype=np.uint8),
+    )
+    scene = _scene(basemap_style="street")
+    try:
+        credit = next(
+            text for text in scene.figure.axes[0].texts if text.get_text()
+        )
+        drawn = credit.get_text()
+        assert "\n" in drawn  # wrapped
+        axis = scene.figure.axes[0]
+        width_points = axis.get_position().width * scene.figure.get_figwidth() * 72
+        assert max(len(line) for line in drawn.split("\n")) <= width_points / 2.4
+    finally:
+        _close(scene)
+
+
+def test_blank_background_is_credited_to_nobody():
+    scene = _scene()  # fixture stubs load_basemap -> None
+    try:
+        assert not any(_credit_texts(scene))  # only the empty date ticker
+    finally:
+        _close(scene)
+
+
+def test_custom_background_image_gets_no_automatic_credit(tmp_path):
+    image_path = _write_background_image(tmp_path)
+    scene = _scene(background_image=str(image_path))
+    try:
+        assert not any(_credit_texts(scene))  # the image carries its own, if any
+    finally:
+        _close(scene)
+
+
+def test_custom_background_image_credited_when_attribution_set(tmp_path):
+    image_path = _write_background_image(tmp_path)
+    scene = _scene(background_image=str(image_path), attribution="Ordnance Survey")
+    try:
+        assert "Ordnance Survey" in _credit_texts(scene)
+    finally:
+        _close(scene)
+
+
+def test_attribution_overrides_the_style_line(monkeypatch):
+    monkeypatch.setattr(
+        basemap_module,
+        "load_basemap",
+        lambda *a, **k: np.full((8, 6, 3), 100, dtype=np.uint8),
+    )
+    scene = _scene(basemap_style="street", attribution="Esri et al.")
+    try:
+        texts = _credit_texts(scene)
+        assert "Esri et al." in texts
+        assert basemap_module.BASEMAP_STYLES["street"].attribution not in texts
+    finally:
+        _close(scene)
+
+
+def test_empty_attribution_suppresses_the_credit(monkeypatch):
+    """``""`` is a decision, not an absence — it must not fall back to the style."""
+    monkeypatch.setattr(
+        basemap_module,
+        "load_basemap",
+        lambda *a, **k: np.full((8, 6, 3), 100, dtype=np.uint8),
+    )
+    scene = _scene(basemap_style="street", attribution="")
+    try:
+        assert not any(_credit_texts(scene))
+    finally:
+        _close(scene)
+
+
+def _write_background_image(tmp_path):
+    """A tiny on-disk PNG for the ``background_image`` path to open."""
+    from PIL import Image
+
+    path = tmp_path / "background.png"
+    Image.fromarray(np.full((8, 6, 3), 60, dtype=np.uint8)).save(path)
+    return path
 
 
 # --- 5: colourbar spans the global scale ---------------------------------

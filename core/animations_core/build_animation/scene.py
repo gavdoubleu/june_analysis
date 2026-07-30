@@ -1,8 +1,8 @@
 """Stateful render surface for the animation (ADR-0002/0007).
 
 ``Scene(prepared, config)`` owns all matplotlib: it builds the static figure in
-``__init__`` (map ``GeoAxes`` + extent, colourbar on the global scale, basemap,
-date-text) and holds the reused ``heatmap_image`` as instance state. The one
+``__init__`` (map ``GeoAxes`` + extent, colourbar on the global scale, basemap +
+its credit line, date-text) and holds the reused ``heatmap_image`` as instance state. The one
 public verb is :meth:`save`, which bundles a heavy-dep-free
 :class:`~.writers.AnimationSource` and hands it to :func:`writers.encode` — the
 dependency points one way (``Scene -> writers``), the sink never reaches back.
@@ -68,11 +68,17 @@ class Scene:
             projection=_crs_from_name(config.projection),
             title=config.title,
         )
+        basemap_array, is_fetched = self._load_basemap()
         _draw_basemap(
             self._layout.map_axis,
-            self._load_basemap(),
+            basemap_array,
             prepared.utm_bbox,
             self._layout.data_crs,
+            config.basemap_opacity,
+        )
+        _draw_attribution(
+            self._layout.map_axis,
+            _resolve_attribution(config, is_fetched),
         )
         self._mappable = _add_colourbar(
             self._layout.figure,
@@ -135,8 +141,13 @@ class Scene:
             layout.heatmap_image.set_data(grid)
         layout.date_text.set_text(self._prepared.frame_labels[index])
 
-    def _load_basemap(self):
-        """Custom ``background_image`` if set, else the fetched/cached ESRI tile."""
+    def _load_basemap(self) -> tuple[Any, bool]:
+        """``(array, is_fetched)``: custom ``background_image``, else an ESRI tile.
+
+        ``is_fetched`` says whether the array came from ESRI, and so whether a
+        style credit is owed — a custom image carries its own attribution (or
+        none), which is the Consumer's business, not ours.
+        """
         from . import basemap as basemap_module
 
         config = self._config
@@ -145,17 +156,20 @@ class Scene:
             import numpy as _np
             from PIL import Image
 
-            return _np.asarray(
-                Image.open(config.background_image).convert("RGB")
+            return (
+                _np.asarray(Image.open(config.background_image).convert("RGB")),
+                False,
             )
-        return basemap_module.load_basemap(
+        array = basemap_module.load_basemap(
             prepared.utm_bbox,
             prepared.epsg,
             prepared.figsize,
             config.dpi,
+            style=config.basemap_style,
             cache_dir=config.cache_dir,
             require_basemap=config.require_basemap,
         )
+        return array, array is not None
 
 
 def _utm_crs(epsg: int):
@@ -251,13 +265,16 @@ def _draw_basemap(
     basemap_array: Any,
     utm_bbox: dict[str, float],
     data_crs: Any,
+    opacity: float = 1.0,
 ) -> None:
-    """Draw the shaded-relief basemap beneath the heatmap; no-op if ``None``.
+    """Draw the basemap beneath the heatmap; no-op if ``None``.
 
     The array is the ESRI tile in UTM metres (row 0 = north), so it is drawn
     with ``transform=data_crs``, ``origin='upper'`` and the UTM extent; cartopy
     reprojects it if the axis CRS differs. Sits at ``zorder`` 0, under the
-    heatmap.
+    heatmap. ``opacity`` below 1 fades a busy detailed style toward the figure
+    background so its roads and labels stop competing with the low-alpha end of
+    the ramp.
     """
     if basemap_array is None:
         return
@@ -272,8 +289,73 @@ def _draw_basemap(
         extent=extent,
         origin="upper",
         transform=data_crs,
+        alpha=opacity,
         zorder=0,
     )
+
+
+def _resolve_attribution(config: RenderConfig, is_fetched: bool) -> str:
+    """The credit line to stamp: config override, else the style's, else none.
+
+    ``config.attribution`` wins whenever it is set — including ``""``, which
+    suppresses the line for a figure credited in its document caption. So ``None``
+    and ``""`` must stay distinguishable; no falsy test here. With no override, a
+    *fetched* basemap owes its style's credit and anything else owes nothing.
+    """
+    if config.attribution is not None:
+        return config.attribution
+    if not is_fetched:
+        return ""
+    from .basemap import resolve_style
+
+    return resolve_style(config.basemap_style).attribution
+
+
+_ATTRIBUTION_FONTSIZE = 4
+
+
+def _draw_attribution(map_axis: Any, credit: str) -> None:
+    """Stamp the basemap's credit line in the map's bottom-right; no-op if empty.
+
+    Small, muted and above the heatmap (``zorder`` 3) so it stays legible over
+    hot cells. Licence obligation, not decoration — see :data:`BASEMAP_STYLES`.
+
+    ESRI's credit lines run to ~200 characters, wider than the map, so the text
+    is wrapped to the axis. ``Text(wrap=True)`` is no use here: it wraps to the
+    *figure*, which lets the line run out over the margin and the colourbar.
+    """
+    if not credit:
+        return
+    map_axis.text(
+        0.99,
+        0.01,
+        _wrap_to_axis(map_axis, credit),
+        transform=map_axis.transAxes,
+        ha="right",
+        va="bottom",
+        fontsize=_ATTRIBUTION_FONTSIZE,
+        color="black",
+        alpha=0.6,
+        zorder=3,
+    )
+
+
+def _wrap_to_axis(map_axis: Any, text: str) -> str:
+    """``text`` hard-wrapped to roughly the axis width, as newline-joined lines.
+
+    The character budget is estimated from the axis width in points and a mean
+    glyph width of ~0.6 em (measured ~0.53 on these credit lines, rounded up for
+    margin) — good enough for a credit line, and it needs no renderer, which the
+    figure does not yet have at scene-build time.
+    """
+    import textwrap
+
+    figure = map_axis.get_figure()
+    axis_width_points = (
+        map_axis.get_position().width * figure.get_figwidth() * 72.0
+    )
+    characters_per_line = max(20, int(axis_width_points / (_ATTRIBUTION_FONTSIZE * 0.6)))
+    return "\n".join(textwrap.wrap(text, characters_per_line))
 
 
 def _add_colourbar(

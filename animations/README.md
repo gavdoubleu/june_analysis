@@ -146,6 +146,9 @@ render:
 | `dpi` | `120` | resolution |
 | `start_date` | none | ISO date, e.g. `1348-06-01`; labels frames with real dates |
 | `title` | none | figure title |
+| `basemap_style` | `shaded_relief` | `street`/`topo`/`imagery` add roads, towns, labels |
+| `basemap_opacity` | `1.0` | `<1` mutes a busy basemap under the heatmap |
+| `attribution` | style's own | override the credit line; `""` draws none |
 | `background_image` | auto-fetch | path to your own basemap image |
 | `require_basemap` | `false` | `true` = fail rather than render on blank |
 | `cache_dir` | repo-local | where fetched basemap tiles cache |
@@ -161,6 +164,12 @@ editable install from MAY2, not pip-installable by name.
 **Blank/white background** — the ESRI basemap fetch failed, usually no network.
 The render carries on regardless. First fetch needs a connection; after that
 tiles come from the cache. Set `require_basemap: true` to make failure loud.
+
+**Muddy render on a detailed basemap** — `basemap_style: street`/`topo` are bright
+and label-heavy, so a low `alpha_power` leaves the two fighting. Drop
+`basemap_opacity` to ~0.5. Each style stamps its required credit bottom-right;
+`attribution` replaces that line, `attribution: ""` removes it (do that only where
+the surrounding document credits the source).
 
 **Optional deps fail mid-render** — matplotlib/cartopy/ffmpeg are imported lazily,
 so a missing one surfaces *after* the data loads, not at startup. Re-check step 1.

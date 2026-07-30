@@ -51,6 +51,9 @@ class RenderConfig:
     title: str | None = None
 
     # --- basemap -----------------------------------------------------------
+    basemap_style: str = "shaded_relief"  # or street/topo/imagery (BASEMAP_STYLES)
+    basemap_opacity: float = 1.0  # <1 mutes a busy detailed map under the heatmap
+    attribution: str | None = None  # None -> the style's own credit; "" -> none
     background_image: str | None = None  # custom image path (bypasses fetch)
     require_basemap: bool = False  # True -> fetch failure is a hard error
     cache_dir: str | None = None  # None -> _DEFAULT_CACHE_DIR (repo-local, no opt-out)
@@ -58,3 +61,8 @@ class RenderConfig:
     def __post_init__(self) -> None:
         if self.cache_dir is None:
             object.__setattr__(self, "cache_dir", _DEFAULT_CACHE_DIR)
+        # Reject a typo'd style here, at config load, rather than after a full
+        # load+aggregate has run. Imported lazily: basemap is render-adjacent.
+        from .build_animation.basemap import resolve_style
+
+        resolve_style(self.basemap_style)

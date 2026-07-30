@@ -64,7 +64,7 @@ rate re-derived from separately-accumulated counts and population.**
 - A Frame is no longer "one mark per unit at its coordinate" but "one rasterised
   field per bin"; the **Frame** glossary entry is updated to match. Frame ≡
   Aggregate bin is unchanged.
-- Basemaps are fetched once per `(bbox, zone, resolution)` and cached; a failed
+- Basemaps are fetched once per `(bbox, zone, resolution, style)` and cached; a failed
   fetch degrades to a blank background unless `require_basemap` forces the error.
 - `RenderConfig.cache_dir = None` resolves to a repo-local default
   (`core/animations_core/.cache/basemaps`, anchored via `__file__` so it doesn't

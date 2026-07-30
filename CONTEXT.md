@@ -119,11 +119,22 @@ _Avoid_: summing per-unit rates into a cell — crowded cells would read hot fro
 density alone, the artefact this re-derivation exists to kill.
 
 **Basemap**:
-The shaded-relief tile a **Frame** sits on, fetched once per `(bbox, zone,
-resolution)` and cached (ArcGIS World_Shaded_Relief, no key). A failed
+The tile a **Frame** sits on, fetched once per `(bbox, zone, resolution,
+style)` and cached (ArcGIS, no key), and credited on the Frame. A failed
 *network/HTTP* fetch degrades to a blank background unless `require_basemap`
 makes it a hard error; any other failure (malformed input, a bad decode)
 always raises.
+
+**Basemap style**:
+Which background a **Basemap** fetches — shaded relief (the default, era-neutral)
+or a detailed street/topo/imagery map showing roads and place names. An editorial
+choice a config states, never inferred, and each style carries the credit line
+drawn on the **Frame** — a licence obligation, so the two are inseparable. A
+Consumer's own background image is outside this: it carries whatever attribution
+it already carries.
+_Avoid_: treating detail level as inferable from the run's era — nothing in the
+files says a 1348 world must not be drawn on modern motorways; only the config
+says so.
 
 **Consumer**:
 An application built on `core/` — a driver, notebook, or script that loads,
