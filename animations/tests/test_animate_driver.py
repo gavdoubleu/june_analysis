@@ -303,3 +303,42 @@ def test_aggregation_time_start_untouched_without_a_trailing_window():
     assert aggregation_time_start({"time_start": 100.0, "days_per_frame": 1}) == 100.0
     # Nothing to reach back to when the start is inferred from the first event.
     assert aggregation_time_start({"window_days": 7}) is None
+
+
+def test_missing_input_path_names_the_key(tmp_path):
+    from ..animate_epidemic_example import resolve_input_path
+
+    with pytest.raises(ValueError, match="inputs.world"):
+        resolve_input_path({"events": str(tmp_path)}, "world")
+
+
+def test_unedited_template_placeholder_says_so(tmp_path):
+    from ..animate_epidemic_example import resolve_input_path
+
+    # The shipped config_default.yaml is a template; the likeliest first failure
+    # is running it unedited, so the error must point at the config, not h5py.
+    with pytest.raises(FileNotFoundError, match="placeholder"):
+        resolve_input_path({"events": "/path/to/your/run/simulation_events.h5"}, "events")
+
+
+def test_existing_input_path_is_returned(tmp_path):
+    from ..animate_epidemic_example import resolve_input_path
+
+    events = tmp_path / "simulation_events.h5"
+    events.touch()
+    assert resolve_input_path({"events": str(events)}, "events") == str(events)
+
+
+def test_shipped_default_config_is_path_free_and_parses():
+    """The no---config fallback must not encode any developer's home directory."""
+    from pathlib import Path
+
+    import yaml
+
+    from ..animate_epidemic_example import _DEFAULT_CONFIG, resolve_interpolations
+
+    raw = yaml.safe_load(Path(_DEFAULT_CONFIG).read_text())
+    config = resolve_interpolations(raw)  # every ${key} must resolve
+    assert "/home/" not in Path(_DEFAULT_CONFIG).read_text()
+    assert config["inputs"]["events"].startswith("/path/to/")
+    assert not Path(config["output"]["root"]).is_absolute()

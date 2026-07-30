@@ -36,6 +36,9 @@ coordinates.
 
 ## 3. Copy a config and edit it
 
+`config_default.yaml` is a **template**: its paths are `/path/to/...`
+placeholders you must replace. Copy it, don't edit it in place.
+
 ```bash
 cp animations/configs/config_default.yaml animations/configs/config_mine.yaml
 ```
@@ -46,7 +49,6 @@ Edit these keys, nothing else to start:
 # Top-level scalars are interpolation anchors: any ${key} below resolves to them.
 events_root: /path/to/your/run
 world_root:  /path/to/your/world
-output_root: /path/to/june_analysis/animations/output
 
 inputs:
   events: ${events_root}/simulation_events.h5
@@ -57,7 +59,7 @@ aggregate:
   days_per_frame: 1            # one frame per day — see "Timing" below
 
 output:
-  root:   ${output_root}
+  root:   animations/output    # relative to the repo root you run from
   name:   my_animation         # defaults to event_type
   format: mp4                  # or gif; or png = last frame only, as a preview
 ```
@@ -73,8 +75,14 @@ lists every type in your run. Pick one and put it back.
 python animations/animate_epidemic_example.py --config animations/configs/config_mine.yaml
 ```
 
-Run from the repo root. Prints `wrote <path>` when done. Omit `--config` and it
-uses `config_default.yaml`.
+Run from the repo root. Prints `wrote <path>` when done.
+
+Omitting `--config` falls back to `config_default.yaml`, which is the unedited
+template — it will stop with `Events file not found ... that is the template's
+placeholder`. Always pass your own copy.
+
+The other `configs/*.yaml` are **Preset**s written against specific runs on the
+author's machine; read them for examples, but their paths won't resolve for you.
 
 One file per run: to get mp4 *and* gif, flip `output.format` and run again.
 
@@ -97,7 +105,60 @@ Two consequences:
 `fps` is an integer, so to slow a weekly render you cannot drop below `fps: 1`.
 Prefer keeping `days_per_frame: 1` and setting `fps` for the pace you want.
 
-## 6. Attribution: which geo unit an event counts against
+## 6. Steadying a noisy render: `window_days`
+
+Daily bins on a small run flicker — a unit with three infections one day and
+none the next strobes. `window_days` replaces each frame's value with the **mean
+per bin over the window ending on that frame**, the epidemiological 7-day
+average:
+
+```yaml
+aggregate:
+  event_type:     infections
+  days_per_frame: 1
+  window_days:    7    # each frame = mean of the 7 days ending on it
+```
+
+Three things to know:
+
+- **The frame count barely changes.** The window *steps* by `days_per_frame`, so
+  consecutive frames overlap — you still get one frame per day, each showing a
+  week's average. This is not the same as `days_per_frame: 7`, which gives one
+  frame per week showing that week's *sum*.
+- **`window_days` must be a whole multiple of `days_per_frame`.** `7` with
+  `days_per_frame: 2` is rejected.
+- **The first frames disappear.** A window that reaches back before the run
+  starts is incomplete, and averaging over a shorter window would invent a
+  spurious onset spike, so those frames are dropped rather than part-averaged.
+  Frames are labelled by their window's *end* date, the "as of" convention.
+
+Don't call this smoothing — in this codebase that word means `sigma`, the
+*spatial* Gaussian (§9), which is an independent knob.
+
+## 7. Clipping the time range: `time_start` and `time_end`
+
+Both are simulation days, both optional; omit them and the animation spans the
+run's first to last event.
+
+```yaml
+aggregate:
+  event_type:     infections
+  days_per_frame: 1
+  time_start:     30    # skip the burn-in
+  time_end:       120
+```
+
+`time_start` means "start the *animation* here", not "pretend earlier events
+never happened". So with `window_days` also set, the driver quietly aggregates
+from `window_days - days_per_frame` further back, and the incomplete frames it
+drops are exactly that lead-in — your first frame lands on day 30 with a full
+window behind it, rather than day 36. Nothing to do; it just works.
+
+That reach-back is impossible when `time_start` is omitted (there is no
+configured start to reach back *from*), so there the run's opening frames are
+simply dropped.
+
+## 8. Attribution: which geo unit an event counts against
 
 An event has two candidate **Geo unit**s — the *venue* it happened at, and the
 *person*'s residence. Which you want depends on the metric, so the default
@@ -121,7 +182,7 @@ aggregate:
   geo_priority: [person]     # or [venue, person], or a bare: person
 ```
 
-## 7. Restyling (optional)
+## 9. Restyling (optional)
 
 Everything cosmetic goes in an optional `render:` block. All keys optional; set
 only what you want to change.

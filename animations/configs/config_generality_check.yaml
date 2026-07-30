@@ -1,0 +1,38 @@
+# Generality-check Preset — acceptance run, not a template (see config_default.yaml).
+# Targets a DIFFERENT run from the plague Preset to prove generality: the engine
+# auto-detects geo/bbox/UTM/population from the files; no plague cosmetics.
+# Paths are machine-specific, as every Preset's are.
+#   python animations/animate_epidemic_example.py --config animations/configs/config_generality_check.yaml
+
+# Top-level scalars are interpolation anchors; any ${key} resolves against them.
+data_root:   /home/gavin/Documents/Black_Death/Animations/animations/data
+world_root:  /home/gavin/Documents/MAY2/MAY/output/Medieval
+output_root: /home/gavin/Documents/June_plus_plus/june_analysis/animations/output
+
+inputs:
+  events: ${data_root}/simulation_events_fitted_with_fairs.h5
+  world:  ${world_root}/world_state_medieval_with_fairs_full.h5
+
+aggregate:
+  event_type:     infections   # required — never inferred (ADR-0008)
+  days_per_frame: 1
+  # window_days:  7   # Trailing window: each frame is the mean per bin over the
+                      # window_days ending on it. Must be a whole multiple of
+                      # days_per_frame; the first incomplete frames are dropped.
+                      # Omit for none.
+
+render:
+  sigma:           10    # SPATIAL Gaussian, in GRID CELLS (not km)
+  grid_resolution: 1.0   # cells per km
+  alpha_power:     0.1   # <1 = low values visible sooner
+  fps:             2
+  # basemap_style:   street   # shaded_relief (default) | street | topo | imagery
+                              # street/topo add roads + place names: use only
+                              # where the era warrants it.
+  # basemap_opacity: 0.55     # <1 mutes a busy basemap under the heatmap
+  # attribution:     ""       # override the style's credit line; "" = draw none
+
+output:
+  root:   ${output_root}
+  name:   generality_check
+  format: mp4

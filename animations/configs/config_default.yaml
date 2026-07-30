@@ -1,37 +1,51 @@
-# Generic default config — the fallback when --config is omitted.
-# Targets a DIFFERENT run from the plague Preset to prove generality: the engine
-# auto-detects geo/bbox/UTM/population from the files; no plague cosmetics.
-#   python animations/animate_epidemic_example.py
+# Default config — a TEMPLATE. Edit the two roots below before running; every
+# other key already has a working default.
+#   cp animations/configs/config_default.yaml animations/configs/config_mine.yaml
+#   python animations/animate_epidemic_example.py --config animations/configs/config_mine.yaml
+# The engine auto-detects geo levels, bbox, UTM zone, bin dates and population
+# from the files, so nothing below describes the world — only your paths and
+# your editorial choices. See animations/README.md.
 
-# Top-level scalars are interpolation anchors; any ${key} resolves against them.
-data_root:   /home/gavin/Documents/Black_Death/Animations/animations/data
-world_root:  /home/gavin/Documents/MAY2/MAY/output/Medieval
-output_root: /home/gavin/Documents/June_plus_plus/june_analysis/animations/output
+# EDIT THESE. Top-level scalars are interpolation anchors; any ${key} below
+# resolves against them. Absolute paths work fine without ${}.
+events_root: /path/to/your/run
+world_root:  /path/to/your/world
 
 inputs:
-  events: ${data_root}/simulation_events_fitted_with_fairs.h5
-  world:  ${world_root}/world_state_medieval_with_fairs_full.h5
+  events: ${events_root}/simulation_events.h5   # required
+  world:  ${world_root}/world_state.h5          # required for a map
 
 aggregate:
-  event_type:     infections   # required — never inferred (ADR-0008)
-  days_per_frame: 1
-  # window_days:  7   # Trailing window: each frame is the mean per bin over the
-                      # window_days ending on it. Must be a whole multiple of
+  event_type:     infections   # required — never inferred (ADR-0008). Leave
+                               # blank and run: the error lists your run's types.
+  days_per_frame: 1            # == Aggregate days_per_bin (one knob, two layers).
+                               # Bins, never skips: each frame sums its window.
+  # window_days:  7   # Trailing window: each frame becomes the mean per bin over
+                      # the window_days ending on it. Must be a whole multiple of
                       # days_per_frame; the first incomplete frames are dropped.
                       # Omit for none.
+  # time_start:   30  # Start the animation at this sim day (burn-in skip). With
+  # time_end:    120  # window_days set, aggregation reaches back further so the
+                      # first frame still has a full window. Omit for the run's
+                      # own first/last event.
+  # geo_priority: [person]   # Which Geo unit an event counts against. Omit for
+                      # the metric's default: person (residence) for
+                      # rate_per_100k, venue-then-person for count.
 
-render:
-  sigma:           10    # SPATIAL Gaussian, in GRID CELLS (not km)
-  grid_resolution: 1.0   # cells per km
-  alpha_power:     0.1   # <1 = low values visible sooner
-  fps:             2
-  # basemap_style:   street   # shaded_relief (default) | street | topo | imagery
-                              # street/topo add roads + place names: use only
-                              # where the era warrants it.
-  # basemap_opacity: 0.55     # <1 mutes a busy basemap under the heatmap
-  # attribution:     ""       # override the style's credit line; "" = draw none
+# Everything cosmetic. All keys optional; delete the block for pure defaults.
+# render:
+#   metric:          rate_per_100k   # or count
+#   ramp:            inferno
+#   sigma:           2.0   # SPATIAL Gaussian, in GRID CELLS (not km)
+#   grid_resolution: 1.0   # cells per km
+#   alpha_power:     1.0   # <1 = low values visible sooner
+#   fps:             2     # 2 sim-days/sec at days_per_frame: 1
+#   start_date:      "2020-03-01"   # labels frames with real dates
+#   title:           "Infections"
+#   basemap_style:   street   # shaded_relief (default) | street | topo | imagery
+#   basemap_opacity: 0.55     # <1 mutes a busy basemap under the heatmap
 
 output:
-  root:   ${output_root}
-  name:   generality_check
-  format: mp4
+  root:   animations/output   # relative to the repo root you run from
+  name:   my_animation        # defaults to event_type
+  format: mp4                 # mp4 | gif | png (last frame only, a quick preview)

@@ -116,6 +116,12 @@ def located_events_for_map(events, event_type, geo_priority=_VENUE_THEN_PERSON):
 
 _DEFAULT_CONFIG = Path(__file__).parent / "configs" / "config_default.yaml"
 
+# inputs: key -> (CONTEXT term, the filename a run writes it as)
+_INPUT_KINDS = {
+    "events": ("Events file", "simulation_events.h5"),
+    "world": ("World file", "world_state.h5"),
+}
+
 
 def parse_args(argv=None):
     """CLI: ``--config PATH`` only (decision 4). Defaults to the driver's
@@ -151,6 +157,31 @@ def resolve_output_path(output_block: dict, event_type: str) -> str:
     name = output_block.get("name") or event_type
     fmt = output_block.get("format", "mp4")
     return str(Path(root) / f"{name}.{fmt}")
+
+
+def resolve_input_path(inputs: dict, key: str) -> str:
+    """One `inputs:` path, checked for existence before any reader touches it.
+
+    The shipped ``config_default.yaml`` is a template with ``/path/to/...``
+    placeholders, so "you did not edit the config" is the single most likely
+    first failure. h5py reports that as a wall of ``errno = 2`` text naming
+    flags and o_flags; say it plainly instead.
+    """
+    kind, filename = _INPUT_KINDS[key]
+    path = inputs.get(key)
+    if not path:
+        raise ValueError(
+            f"inputs.{key} is missing from the config; it must point at your "
+            f"run's {kind} ({filename})"
+        )
+    if not Path(path).exists():
+        hint = (
+            " — that is the template's placeholder, edit the config's roots"
+            if "/path/to/" in str(path)
+            else ""
+        )
+        raise FileNotFoundError(f"{kind} not found (inputs.{key}): {path}{hint}")
+    return path
 
 
 def resolve_event_type(events, aggregate_block: dict) -> str:
@@ -250,7 +281,12 @@ def run(config: dict) -> str:
     aggregate_block = config.get("aggregate", {})
     output_block = config.get("output", {})
 
-    events = SimulationEvents(inputs["events"])
+    # Both paths up front: a missing World file should not surface only after the
+    # whole events load and aggregate have run.
+    events_path = resolve_input_path(inputs, "events")
+    world_path = resolve_input_path(inputs, "world")
+
+    events = SimulationEvents(events_path)
     event_type = resolve_event_type(events, aggregate_block)
 
     # RenderConfig first: the metric decides how events are attributed to Geo
@@ -282,7 +318,7 @@ def run(config: dict) -> str:
     if window_days is not None:
         aggregate = trailing_mean(aggregate, float(window_days))
 
-    world = load_world(inputs["world"])
+    world = load_world(world_path)
 
     output_path = resolve_output_path(output_block, event_type)
     Path(output_path).parent.mkdir(parents=True, exist_ok=True)
