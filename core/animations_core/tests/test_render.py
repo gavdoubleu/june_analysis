@@ -87,6 +87,24 @@ def test_prepare_bakes_the_metric_label():
     assert count.metric_label == "count"
 
 
+def test_prepare_states_the_trailing_window_in_the_metric_label():
+    # A windowed frame shows a multi-day mean under a single "as of" date, so
+    # the colourbar — where units live — has to say so. Derived from the
+    # Aggregate, not a config knob, so it cannot fall out of sync.
+    windowed = Aggregate(
+        counts=np.arange(6, dtype="float64").reshape(3, 2),
+        geo_unit_ids=np.array([10, 20], dtype=np.int64),
+        bin_starts=np.arange(3, dtype="float64"),
+        days_per_bin=1.0,
+        event_type="infection",
+        window_days=7.0,
+    )
+
+    prepared = render.prepare(windowed, _world(), RenderConfig(metric="rate_per_100k"))
+
+    assert prepared.metric_label == "rate per 100k (7-day mean)"
+
+
 def test_prepare_dates_use_start_date_when_given():
     aggregate = _aggregate(n_bins=2)
     config = RenderConfig(start_date=date(2020, 3, 1))

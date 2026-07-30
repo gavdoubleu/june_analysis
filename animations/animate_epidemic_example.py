@@ -8,6 +8,7 @@ Lives in ``animations/`` (a Consumer), imports nothing new into ``core/``.
 
 from __future__ import annotations
 
+import logging
 import re
 import sys
 from datetime import date
@@ -66,6 +67,27 @@ def resolve_geo_priority(aggregate_block: dict, metric: str):
             f"{list(_VENUE_THEN_PERSON)}"
         )
     return tuple(requested)
+
+
+def aggregation_time_start(aggregate_block: dict) -> float | None:
+    """The ``time_start`` to *aggregate* from, given the config's animation start.
+
+    ``time_start`` means "start the animation here" — a burn-in skip, not a claim
+    that earlier events are invalid. So with a **Trailing window** the aggregate
+    reaches back ``window_days - days_per_frame`` further, and the leading
+    incomplete bins that `trailing_mean` drops are exactly that lead-in: the
+    first surviving Frame lands on the configured ``time_start`` with a full
+    window behind it.
+
+    Returns ``None`` unchanged — an inferred start (the first event) has nothing
+    to reach back to, so those frames are simply dropped.
+    """
+    time_start = aggregate_block.get("time_start")
+    window_days = aggregate_block.get("window_days")
+    if time_start is None or window_days is None:
+        return time_start
+    days_per_frame = float(aggregate_block.get("days_per_frame", 1.0))
+    return float(time_start) - (float(window_days) - days_per_frame)
 
 
 def located_events_for_map(events, event_type, geo_priority=_VENUE_THEN_PERSON):
@@ -219,6 +241,7 @@ def run(config: dict) -> str:
     render one file. Returns the written path.
     """
     from core.aggregate.aggregate import aggregate_events
+    from core.aggregate.trailing_window import trailing_mean
     from core.animations_core import animate
     from core.load_data.simulation_events import SimulationEvents
     from core.load_data.world.world import load_world
@@ -237,13 +260,27 @@ def run(config: dict) -> str:
     geo_priority = resolve_geo_priority(aggregate_block, render_config.metric)
     located = located_events_for_map(events, event_type, geo_priority)
 
+    days_per_frame = aggregate_block.get("days_per_frame", 1.0)
+    window_days = aggregate_block.get("window_days")
+    aggregation_start = aggregation_time_start(aggregate_block)
+    if window_days is not None and aggregation_start is not None:
+        logging.info(
+            "trailing window: aggregating from day %g so the first frame at day "
+            "%g has a full %g-day window",
+            aggregation_start,
+            aggregate_block["time_start"],
+            window_days,
+        )
+
     aggregate = aggregate_events(
         located,
         event_type=event_type,
-        days_per_bin=aggregate_block.get("days_per_frame", 1.0),
-        time_start=aggregate_block.get("time_start"),
+        days_per_bin=days_per_frame,
+        time_start=aggregation_start,
         time_end=aggregate_block.get("time_end"),
     )
+    if window_days is not None:
+        aggregate = trailing_mean(aggregate, float(window_days))
 
     world = load_world(inputs["world"])
 

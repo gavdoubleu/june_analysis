@@ -86,7 +86,23 @@ One rendered image in an animation — and **exactly one Aggregate bin**. The
 animator rasterises `counts[bin, :]` (or rate) into a **Density heatmap**; it
 never re-bins. The config's `days_per_frame` *is* the Aggregate's `days_per_bin`,
 one knob seen from two layers — there is no second binning step below the engine.
+A **Trailing window** does not weaken this: it rewrites the **Aggregate** *above*
+the engine, so a Frame is still exactly one row of whatever Aggregate it is
+handed.
 _Avoid_: treating `days_per_frame` and `days_per_bin` as independent.
+
+**Trailing window**:
+A rewrite of an **Aggregate** in which each bin's value becomes the *mean per
+bin* over the `window_days` ending at (and including) that bin — so a Frame reads
+a 7-day average rather than one day's events. The window's **step** stays
+`days_per_bin`, so consecutive bins overlap; `window_days` records the coverage
+and must be a whole multiple of `days_per_bin`. Bins whose window is incomplete
+(the first few) are **dropped**, not partially averaged — a smaller divisor is a
+different statistic, and would read as a spurious onset spike. Labelled by its
+window-*end* date, the epidemiological "as of" convention.
+_Avoid_: calling this "smoothing" — in this codebase that word means the
+*spatial* Gaussian (`sigma`) of a **Density heatmap**, an independent knob.
+_Avoid_: "rolling" — it does not distinguish trailing from centred.
 
 **Density heatmap**:
 How each **Frame** is drawn (ADR-0007): per-**Geo unit** scalars are rasterised

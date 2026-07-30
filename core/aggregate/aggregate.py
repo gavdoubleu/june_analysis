@@ -27,8 +27,18 @@ from .kernels import count_dense
 class Aggregate:
     """Dense time x geo count result.
 
-    ``counts`` is ``(n_bins, n_geo)``; row *i* covers ``[bin_starts[i],
-    bin_starts[i] + days_per_bin)``; column *j* is ``geo_unit_ids[j]``.
+    ``counts`` is ``(n_bins, n_geo)`` events per bin; column *j* is
+    ``geo_unit_ids[j]``. ``days_per_bin`` is the **step** between bins, so row
+    *i* starts at ``bin_starts[i]``.
+
+    Coverage is a separate question from step. Straight from ``aggregate_events``
+    bins are disjoint (``window_days is None``) and row *i* covers exactly
+    ``[bin_starts[i], bin_starts[i] + days_per_bin)`` with integer counts. After
+    a *Trailing window* (``trailing_window.trailing_mean``) ``window_days``
+    records a coverage wider than the step: row *i* covers
+    ``[bin_starts[i] + days_per_bin - window_days, bin_starts[i] +
+    days_per_bin)``, consecutive rows overlap, and ``counts`` holds a fractional
+    *mean per bin* over that window.
     """
 
     counts: np.ndarray
@@ -36,6 +46,7 @@ class Aggregate:
     bin_starts: np.ndarray
     days_per_bin: float
     event_type: str
+    window_days: float | None = None
 
     def rate_per_100k(self, population_by_geo_unit) -> np.ndarray:
         """Per-100k rates given a ``{geo_unit_id: population}`` map.

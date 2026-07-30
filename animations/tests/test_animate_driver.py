@@ -263,3 +263,43 @@ def test_map_located_drops_geo_still_unplaceable(tmp_path):
         )
     located = located_events_for_map(SimulationEvents(str(path)), "infections")
     assert np.isnan(located["geo_unit_id"].to_numpy()).all()
+
+
+def test_trailing_window_config_reaches_back_so_frame_one_lands_on_time_start():
+    # time_start means "start the animation here", not "ignore earlier events":
+    # the driver aggregates from far enough back that the first *complete*
+    # window ends on the configured day, so no burn-in-skipping frame is lost.
+    import numpy as np
+    import pandas as pd
+
+    from core.aggregate.aggregate import aggregate_events
+    from core.aggregate.trailing_window import trailing_mean
+
+    from ..animate_epidemic_example import aggregation_time_start
+
+    aggregate_block = {"time_start": 100.0, "days_per_frame": 1, "window_days": 7}
+    assert aggregation_time_start(aggregate_block) == 94.0
+
+    # One event a day from day 90 to 109, all in one geo unit.
+    events = pd.DataFrame(
+        {"time": np.arange(90.0, 110.0) + 0.5, "geo_unit_id": np.full(20, 5)}
+    )
+    aggregate = aggregate_events(
+        events,
+        event_type="infections",
+        days_per_bin=1.0,
+        time_start=aggregation_time_start(aggregate_block),
+    )
+    windowed = trailing_mean(aggregate, window_days=7.0)
+
+    assert windowed.bin_starts[0] == 100.0
+    # Days 94-100 each carried one event, so the first frame's mean is 1.
+    assert windowed.counts[0, 0] == pytest.approx(1.0)
+
+
+def test_aggregation_time_start_untouched_without_a_trailing_window():
+    from ..animate_epidemic_example import aggregation_time_start
+
+    assert aggregation_time_start({"time_start": 100.0, "days_per_frame": 1}) == 100.0
+    # Nothing to reach back to when the start is inferred from the first event.
+    assert aggregation_time_start({"window_days": 7}) is None

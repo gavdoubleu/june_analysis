@@ -7,8 +7,13 @@ expensive pipeline runs a single time; the same ``Prepared`` can drive several
 :class:`~.scene.Scene`s (different cosmetics) without re-running ``prepare()``.
 
 Frame == Aggregate bin (CONTEXT glossary): one smoothed grid per row of
-``aggregate.counts``, each read from strictly its own bin (no temporal
-smoothing). The colour scale is global across all frames (ADR-0006).
+``aggregate.counts``, each read from strictly its own row — this module never
+re-bins and holds no temporal window of its own. A multi-day average reaches it
+as an already-rewritten Aggregate (a *Trailing window*, applied above the engine
+by ``core.aggregate.trailing_window``), which it renders row-per-frame like any
+other; ``aggregate.window_days`` is read for the colourbar label alone. ``sigma``
+smoothing here is purely *spatial*. The colour scale is global across all frames
+(ADR-0006).
 
 Coordinate policy: units carrying events *must* map to a coordinate. Missing
 coordinates are first back-filled from the World (``infer_missing_coordinates``);
@@ -105,7 +110,7 @@ def prepare(aggregate, world, config: RenderConfig) -> Prepared:
 
     vmin, vmax = global_value_range(smoothed_grids)
     frame_labels = _frame_labels(aggregate.bin_starts, config.start_date)
-    metric_label = _METRIC_LABELS.get(config.metric, config.metric)
+    metric_label = _metric_label(config.metric, aggregate.window_days)
 
     return Prepared(
         smoothed_grids=smoothed_grids,
@@ -118,6 +123,19 @@ def prepare(aggregate, world, config: RenderConfig) -> Prepared:
         vmax=vmax,
         metric_label=metric_label,
     )
+
+
+def _metric_label(metric: str, window_days: float | None) -> str:
+    """The colourbar's descriptor, qualified when a *Trailing window* is in play.
+
+    A windowed frame carries one date but shows a multi-day mean, so the
+    qualifier belongs where a reader checks units. Derived from the Aggregate
+    rather than configured, so it cannot disagree with the actual window.
+    """
+    label = _METRIC_LABELS.get(metric, metric)
+    if window_days is None:
+        return label
+    return f"{label} ({window_days:g}-day mean)"
 
 
 def _bounding_box(eastings: np.ndarray, northings: np.ndarray) -> dict[str, float]:
