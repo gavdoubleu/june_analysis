@@ -71,8 +71,11 @@ skipped, not raised.
 **Aggregate**:
 A time-binned per-**Geo unit** summary of events — counts, or rate-per-100k once
 population is known. Produced by `core/aggregate` from a **Located event table**,
-keyed on `geo_unit_id`. The reusable intermediate every **Consumer** builds on;
-exportable to CSV.
+keyed on `geo_unit_id`. The reusable intermediate every **Consumer** builds on. A
+Consumer wanting it on disk tidies it (`to_long_dataframe`) and writes the frame
+itself — `core` owns no CSV writer, and no reader: a CSV is an *export*, never a
+re-loadable Aggregate.
+_Avoid_: treating an exported CSV as an interchange format `core` can round-trip.
 
 **Population**:
 The resident count of a **Geo unit**, *subtree-aggregated* — a unit's population
