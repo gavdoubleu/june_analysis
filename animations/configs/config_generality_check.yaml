@@ -1,6 +1,7 @@
 # Generality-check Preset — acceptance run, not a template (see config_default.yaml).
-# Targets a DIFFERENT run from the plague Preset to prove generality: the engine
-# auto-detects geo/bbox/UTM/population from the files; no plague cosmetics.
+# A second run with the cosmetics off: the engine auto-detects geo/bbox/UTM/
+# population from the files. Same medieval world family as the plague Preset, so
+# it proves the defaults hold on another run, not generality across domains.
 # Paths are machine-specific, as every Preset's are.
 #   python animations/animate_epidemic_example.py --config animations/configs/config_generality_check.yaml
 

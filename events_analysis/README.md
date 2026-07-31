@@ -114,12 +114,43 @@ Two things that surprise people:
   top level; see §6 of [animations/README.md](../animations/README.md) for what
   it does to the first few bins.
 
-## 6. Rate per 100k
+## 6. What needs the World file
 
-Needs population, which lives in the **World file** — so this one step leaves the
-events-only path and does need `world_reader` installed (see
-[animations/README.md](../animations/README.md) §1). Without it you get counts,
-which is what most curves want anyway.
+Two steps leave the events-only path, both because they need something only the
+**World file** holds. Each needs `world_reader` installed (see
+[animations/README.md](../animations/README.md) §1); without it you get counts at
+the run's own geo level, which is what most curves want anyway.
+
+**Rate per 100k** needs population. `aggregate.rate_per_100k(...)` takes the map
+in, so `core.aggregate` never imports the world module.
+
+**Rolling up to a coarser geo level** needs the hierarchy. An `Aggregate` is
+keyed on whatever level the run's lookups resolved — often thousands of small
+units, and not necessarily the same level as another run:
+
+```python
+from core.aggregate.rollup import rollup
+from core.load_data.world import load_world
+
+world = load_world(world_path)
+print(world.geo_levels())                       # this run's levels, coarsest first
+
+rolled = rollup(aggregate, world.ancestor_by_geo_unit("region"))
+```
+
+Like `trailing_mean`, `rollup` is not exported from `core.aggregate`'s top level;
+import it by module path. Three things to know:
+
+- **Level names are per run**, so there is no portable `"region"` — ask
+  `world.geo_levels()`. An unknown name raises, listing the run's own.
+- **Nothing is dropped.** A column with no ancestor at that level — the `-1`
+  sentinel, or a unit on a ragged branch — keeps its own column and is warned
+  about once, so totals are conserved and the result is not guaranteed
+  homogeneous in level.
+- **Rates need no extra work**: population is subtree-aggregated, so a rolled-up
+  unit's denominator is already its own entry in the map.
+
+See the last two cells of `plot_infections_facade.ipynb` for a worked example.
 
 ## Troubleshooting
 

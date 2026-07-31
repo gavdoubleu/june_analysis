@@ -53,6 +53,11 @@ class World:
 
     geography: GeographyManager
     _population_by_geo_unit: dict[int, int]
+    # Coarse->fine, from `metadata/registries/geo_levels`; the *only* ordered
+    # source of level names. `GeographyManager.levels` is first-seen over unit
+    # file order, which has no relation to depth. ``None`` when the World file
+    # carries no registry.
+    _level_registry: tuple[str, ...] | None = None
 
     def geo_unit_coords(self) -> dict[int, tuple[float, float]]:
         """``{geo_unit_id: (lat, lon)}`` (WGS84) for every unit with coordinates."""
@@ -66,6 +71,50 @@ class World:
         normalisation.
         """
         return dict(self._population_by_geo_unit)
+
+    def geo_levels(self) -> list[str]:
+        """The run's **Geo level** names, coarsest first.
+
+        From the World file's level registry. Falls back to the hierarchy's own
+        first-seen list where a World file carries no registry — the names are
+        still right, only the *order* is then meaningless.
+        """
+        if self._level_registry is not None:
+            return list(self._level_registry)
+        return list(self.geography.levels)
+
+    def ancestor_by_geo_unit(self, level: str) -> dict[int, int]:
+        """``{geo_unit_id: ancestor_geo_unit_id}`` at `level` — a **Rollup**'s map.
+
+        Walks each unit's parent chain until a unit at `level` is found; a unit
+        already at `level` maps to itself. Units with no ancestor there — an
+        **Orphan unit**, a ragged branch, or a unit coarser than `level` — are
+        **omitted**, and `core.aggregate.rollup.rollup` keeps their columns as
+        they are rather than dropping their counts.
+
+        The walk needs no level ordering, so a ragged hierarchy is fine.
+
+        Raises ``ValueError`` for a level name this run does not have: level
+        names are per-run, so a typo would otherwise return an empty map and
+        roll every column up to nothing.
+        """
+        known_levels = self.geo_levels()
+        if level not in known_levels:
+            raise ValueError(
+                f"unknown geo level {level!r}; this world has "
+                f"{known_levels} (coarsest first)"
+            )
+
+        ancestors = {}
+        # Sourced from the hierarchy, not `population_by_geo_unit()`: upstream
+        # omits childless zero-population units from the statistics entirely.
+        for unit_id, unit in self.geography.units_by_id.items():
+            ancestor = unit
+            while ancestor is not None and ancestor.level != level:
+                ancestor = ancestor.parent
+            if ancestor is not None:
+                ancestors[unit_id] = ancestor.id
+        return ancestors
 
     def infer_missing_coordinates(self) -> int:
         """Fill coord-less units from their children's mean, in place.
@@ -103,4 +152,10 @@ def load_world(path: str | Path) -> World:
     population_by_geo_unit = {
         unit_id: stats.population for unit_id, stats in unit_statistics.items()
     }
-    return World(geography=geography, _population_by_geo_unit=population_by_geo_unit)
+    return World(
+        geography=geography,
+        _population_by_geo_unit=population_by_geo_unit,
+        _level_registry=(
+            None if level_registry is None else tuple(str(name) for name in level_registry)
+        ),
+    )

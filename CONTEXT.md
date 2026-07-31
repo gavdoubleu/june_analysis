@@ -36,6 +36,32 @@ An addressable geographic area in the world hierarchy (identified by
 carry a `geo_unit_id`, so aggregation keys on it **without needing coordinates** —
 this is what makes the events-only path possible.
 
+**Geo level**:
+A named tier of the world hierarchy (e.g. `region`, `area`). A **per-run
+registry**, not a fixed vocabulary — each **World file** declares its own level
+names, ordered coarse-to-fine. A Consumer names the level it wants; the name is
+validated against that run's registry, never assumed.
+_Avoid_: treating the level names of one run as portable to another, or reading
+an ordering off the loaded hierarchy's level list — only the registry is ordered.
+
+**Rollup**:
+A rewrite of an **Aggregate** onto a coarser **Geo level**: each column is
+re-keyed to its ancestor at the requested level and counts are summed. Sits
+*above* the engine (like a **Trailing window**), so `aggregate_events`'s input is
+still a resolved `geo_unit_id` and one extraction serves every level. Rate stays
+correct without special handling, because **Population** is already
+subtree-aggregated. A unit already at the requested level maps to itself.
+Units that cannot be placed — the `-1` sentinel, an **Orphan unit**, or an id
+absent from the World file — keep their own column and are warned about, never
+dropped and never merged: a Rollup loses no events, so its columns are not
+guaranteed homogeneous in level.
+_Avoid_: calling a Rollup "re-binning" — binning is temporal and untouched here.
+
+**Orphan unit**:
+A **Geo unit** whose parent chain reaches a root without passing through the
+**Geo level** a **Rollup** asked for — a ragged hierarchy, or a unit already
+coarser than the level requested. Survives a Rollup as its own column.
+
 **Decoded event table**:
 A single **Event type**'s rows with **Registry** codes resolved to labels (via
 `decode_registry_column`) but *without* the **Lookup table** people/venue joins of

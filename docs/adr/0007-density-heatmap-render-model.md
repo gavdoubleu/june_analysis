@@ -71,3 +71,28 @@ rate re-derived from separately-accumulated counts and population.**
   depend on the caller's working directory) rather than disabling the cache.
   There is deliberately no way to fully turn caching off — nothing needs it, and
   a `None`-means-disabled reading contradicted the module's own docstring.
+
+## Amendment — a coarser Geo level does not fix a map, it degrades one
+
+A recurring suggestion is that national-scale maps need events rolled up to a
+coarser **Geo level** first, on the assumption that thousands of fine units are
+what makes them slow and illegible. This ADR already answers that: rasterising to
+a grid is what scales to thousands of units, and re-deriving **Cell rate** from
+separately-summed extensives is what stops crowding reading as intensity. The
+unit count is not the problem.
+
+Coarsening before rendering makes the picture worse. Each unit's scalar is
+splatted at its **centroid**, so a rolled-up unit puts a whole region's counts
+*and* population on one grid point. The field collapses to a handful of Gaussian
+blobs centred on points that are frequently uninhabited, with NaN between them.
+**Cell rate** stays arithmetically valid — it is still a ratio of summed
+extensives — but the spatial resolution the grid exists to provide has been
+discarded before rasterisation ever runs. Nor is it a speed win: splatting a few
+thousand centroids is negligible beside grid × frame work.
+
+So **Rollup** (see ADR-0005's amendment) lives in `core` for tables, curves and
+cross-run comparison, and the animator does not expose a level knob. Should a
+genuine map need for one appear, it costs a single config key — but it must be
+justified by that need, not by unit count. If national maps prove unsatisfactory,
+look first at extent, `grid_resolution`, `sigma` and basemap resolution, which
+are the knobs that actually govern how the field reads.
