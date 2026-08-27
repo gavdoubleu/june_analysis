@@ -52,12 +52,21 @@ def rollup(aggregate: Aggregate, ancestor_by_geo_unit: dict[int, int]) -> Aggreg
         if int(geo_unit_id) not in ancestor_by_geo_unit
     ]
     if unplaceable:
+        # Cap the logged ids: a real ragged-hierarchy mismatch can leave every
+        # column unplaceable, and interpolating the whole list makes a
+        # multi-megabyte single log line hostile to terminals, log
+        # aggregators, notebooks.
+        unplaceable_id_cap = 20
+        shown = unplaceable[:unplaceable_id_cap]
+        overflow = len(unplaceable) - len(shown)
+        suffix = f" (+{overflow} more)" if overflow else ""
         logger.warning(
             "%d geo unit(s) have no ancestor at the requested level and keep "
-            "their own column: %s. Wrong world_state.h5, or a geo-level "
+            "their own column: %s%s. Wrong world_state.h5, or a geo-level "
             "mismatch between events and world?",
             len(unplaceable),
-            unplaceable,
+            shown,
+            suffix,
         )
 
     # Sorted-unique output keeps the invariant `aggregate_events` establishes via
