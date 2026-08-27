@@ -1,13 +1,16 @@
 """Driver config logic: interpolation, RenderConfig mapping, error paths.
 
 Behaviour through the driver's public helpers — no HDF5, no render deps. The
-engine composition (load -> aggregate -> world -> render) is covered by the real
-plague/generality acceptance runs, not mocked here.
+ordering-sensitive engine composition (event_type -> RenderConfig ->
+geo_priority -> located events -> aggregate -> trailing window -> world) lives
+in ``build_pipeline`` and is covered end-to-end in ``test_build_pipeline.py``,
+against real vendored fixtures.
 """
 
 import pytest
 
-from ..animate_epidemic_example import render_config_from, resolve_interpolations
+from ..animate_epidemic_example import resolve_interpolations
+from ..build_pipeline import render_config_from
 
 
 def test_interpolation_resolves_against_top_level_scalars():
@@ -68,7 +71,7 @@ def _write_events(path):
 def test_missing_event_type_errors_listing_available(tmp_path):
     from core.load_data.simulation_events import SimulationEvents
 
-    from ..animate_epidemic_example import resolve_event_type
+    from ..build_pipeline import resolve_event_type
 
     events = SimulationEvents(_write_events(tmp_path / "e.h5"))
     with pytest.raises(ValueError, match=r"event_type.*infections.*deaths|deaths.*infections"):
@@ -78,7 +81,7 @@ def test_missing_event_type_errors_listing_available(tmp_path):
 def test_present_event_type_is_returned(tmp_path):
     from core.load_data.simulation_events import SimulationEvents
 
-    from ..animate_epidemic_example import resolve_event_type
+    from ..build_pipeline import resolve_event_type
 
     events = SimulationEvents(_write_events(tmp_path / "e.h5"))
     assert resolve_event_type(events, {"event_type": "infections"}) == "infections"
@@ -87,7 +90,7 @@ def test_present_event_type_is_returned(tmp_path):
 def test_unknown_event_type_errors_listing_available(tmp_path):
     from core.load_data.simulation_events import SimulationEvents
 
-    from ..animate_epidemic_example import resolve_event_type
+    from ..build_pipeline import resolve_event_type
 
     events = SimulationEvents(_write_events(tmp_path / "e.h5"))
     with pytest.raises(ValueError, match="infections"):
@@ -179,7 +182,7 @@ def test_map_located_falls_back_from_seed_venue_to_person_geo(tmp_path):
 
     from core.load_data.simulation_events import SimulationEvents
 
-    from ..animate_epidemic_example import located_events_for_map
+    from ..build_pipeline import located_events_for_map
 
     events = SimulationEvents(_write_events_with_seed_venue(tmp_path / "e.h5"))
     located = located_events_for_map(events, "infections")
@@ -191,20 +194,20 @@ def test_rate_metric_attributes_by_residence_not_venue():
     # A rate's denominator is resident population, so its numerator must count
     # residents; venue attribution puts a fair's visitors on its host unit and
     # yields impossible rates.
-    from ..animate_epidemic_example import default_geo_priority
+    from ..build_pipeline import default_geo_priority
 
     assert default_geo_priority("rate_per_100k") == ("person",)
 
 
 def test_count_metric_keeps_venue_attribution():
     # No denominator, so "where transmission happened" is the useful signal.
-    from ..animate_epidemic_example import default_geo_priority
+    from ..build_pipeline import default_geo_priority
 
     assert default_geo_priority("count") == ("venue", "person")
 
 
 def test_config_geo_priority_overrides_the_metric_default():
-    from ..animate_epidemic_example import resolve_geo_priority
+    from ..build_pipeline import resolve_geo_priority
 
     # counts by residence — the configurable case
     assert resolve_geo_priority({"geo_priority": ["person"]}, "count") == ("person",)
@@ -213,14 +216,14 @@ def test_config_geo_priority_overrides_the_metric_default():
 
 
 def test_absent_geo_priority_falls_back_to_metric_default():
-    from ..animate_epidemic_example import resolve_geo_priority
+    from ..build_pipeline import resolve_geo_priority
 
     assert resolve_geo_priority({}, "rate_per_100k") == ("person",)
     assert resolve_geo_priority({}, "count") == ("venue", "person")
 
 
 def test_unknown_geo_priority_source_is_rejected():
-    from ..animate_epidemic_example import resolve_geo_priority
+    from ..build_pipeline import resolve_geo_priority
 
     with pytest.raises(ValueError, match="geo_priority.*postcode"):
         resolve_geo_priority({"geo_priority": ["postcode"]}, "count")
@@ -234,7 +237,7 @@ def test_person_priority_attributes_event_to_residence_not_venue(tmp_path):
 
     from core.load_data.simulation_events import SimulationEvents
 
-    from ..animate_epidemic_example import located_events_for_map
+    from ..build_pipeline import located_events_for_map
 
     events = SimulationEvents(_write_events_with_seed_venue(tmp_path / "e.h5"))
     located = located_events_for_map(events, "infections", ("person",))
@@ -249,7 +252,7 @@ def test_map_located_drops_geo_still_unplaceable(tmp_path):
 
     from core.load_data.simulation_events import SimulationEvents
 
-    from ..animate_epidemic_example import located_events_for_map
+    from ..build_pipeline import located_events_for_map
 
     path = tmp_path / "e.h5"
     with h5py.File(path, "w") as fh:
@@ -275,7 +278,7 @@ def test_trailing_window_config_reaches_back_so_frame_one_lands_on_time_start():
     from core.aggregate.aggregate import aggregate_events
     from core.aggregate.trailing_window import trailing_mean
 
-    from ..animate_epidemic_example import aggregation_time_start
+    from ..build_pipeline import aggregation_time_start
 
     aggregate_block = {"time_start": 100.0, "days_per_frame": 1, "window_days": 7}
     assert aggregation_time_start(aggregate_block) == 94.0
@@ -298,7 +301,7 @@ def test_trailing_window_config_reaches_back_so_frame_one_lands_on_time_start():
 
 
 def test_aggregation_time_start_untouched_without_a_trailing_window():
-    from ..animate_epidemic_example import aggregation_time_start
+    from ..build_pipeline import aggregation_time_start
 
     assert aggregation_time_start({"time_start": 100.0, "days_per_frame": 1}) == 100.0
     # Nothing to reach back to when the start is inferred from the first event.
