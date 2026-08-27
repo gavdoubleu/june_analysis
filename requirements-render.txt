@@ -14,3 +14,4 @@ scipy           # gaussian_filter in raster.smooth_grid — every heatmap needs 
 requests        # ESRI basemap tile fetch
 imageio-ffmpeg  # mp4 encode; ships a bundled ffmpeg binary (tens of MB)
 pyyaml          # the animations/ driver reads its --config YAML
+jupyter         # example notebooks under events_analysis/example_scripts
