@@ -93,7 +93,9 @@ class World:
         if self._level_registry is None:
             raise ValueError(
                 "this world has no geo-level registry; the levels are "
-                f"{self.geo_levels()}, but their order is meaningless"
+                f"{self.geo_levels()}, but their order is meaningless. Name a "
+                "level explicitly (the `level` argument to ancestor_by_geo_unit, "
+                "e.g. via a geo_level variable) instead of indexing this list."
             )
         return self._level_registry
 
