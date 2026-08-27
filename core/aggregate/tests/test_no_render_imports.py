@@ -12,6 +12,8 @@ _PROBE = """
 import sys
 import numpy as np, pandas as pd
 import core.aggregate as agg
+import core.aggregate.rollup as rollup
+import core.aggregate.trailing_window as trailing_window
 import core.load_data.geo_events  # noqa: F401 — must import render-free too
 
 events = pd.DataFrame({
@@ -21,6 +23,10 @@ events = pd.DataFrame({
 aggregate = agg.aggregate_events(events, event_type="infections")
 agg.epidemic_curve(aggregate)
 agg.to_long_dataframe(aggregate)
+# rollup/trailing_window aren't exported from core.aggregate, so the import
+# above doesn't reach them — exercise both explicitly.
+rollup.rollup(aggregate, ancestor_by_geo_unit={1: 1, 2: 1})
+trailing_window.trailing_mean(aggregate, window_days=1.0)
 
 leaked = [m for m in ("matplotlib", "cartopy", "imageio_ffmpeg", "ffmpeg")
           if m in sys.modules]
