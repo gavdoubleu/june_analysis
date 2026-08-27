@@ -91,7 +91,11 @@ array. One extraction now serves every level.
   are simply omitted from the map — since the parent walk never needs to know
   which of two levels is coarser. With no registry, `geo_levels()` falls back to
   the hierarchy's own first-seen list: the names are still right, only the
-  ordering is meaningless — accepted.
+  ordering is meaningless — accepted. `geo_levels()`'s return type carries no
+  signal of which case a caller got, so it never claims an order; a bad-level
+  `ValueError` states "(coarsest first)" only when a registry backs it.
+  `geo_levels_coarsest_first()` is the order-guaranteeing accessor: it raises
+  rather than hand back a meaningless order where there is no registry.
 - `Aggregate` gains **no** `geo_level` field: the caller asks for a level and so
   knows it, and an Aggregate never round-trips from disk (a CSV export is not a
   re-loadable Aggregate), so it cannot arrive detached from the call.

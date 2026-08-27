@@ -73,15 +73,29 @@ class World:
         return dict(self._population_by_geo_unit)
 
     def geo_levels(self) -> list[str]:
-        """The run's **Geo level** names, coarsest first.
+        """The run's **Geo level** names; order not guaranteed.
 
         From the World file's level registry. Falls back to the hierarchy's own
         first-seen list where a World file carries no registry — the names are
-        still right, only the *order* is then meaningless.
+        still right, but the *order* is then meaningless. Use
+        :meth:`geo_levels_coarsest_first` where the order itself matters.
         """
         if self._level_registry is not None:
             return list(self._level_registry)
         return list(self.geography.levels)
+
+    def geo_levels_coarsest_first(self) -> tuple[str, ...]:
+        """The run's **Geo level** names, coarsest first — order guaranteed.
+
+        Raises ``ValueError`` where the World file carries no level registry,
+        rather than silently handing back a meaningless order.
+        """
+        if self._level_registry is None:
+            raise ValueError(
+                "this world has no geo-level registry; the levels are "
+                f"{self.geo_levels()}, but their order is meaningless"
+            )
+        return self._level_registry
 
     def ancestor_by_geo_unit(self, level: str) -> dict[int, int]:
         """``{geo_unit_id: ancestor_geo_unit_id}`` at `level` — a **Rollup**'s map.
@@ -100,9 +114,10 @@ class World:
         """
         known_levels = self.geo_levels()
         if level not in known_levels:
+            order_claim = " (coarsest first)" if self._level_registry is not None else ""
             raise ValueError(
                 f"unknown geo level {level!r}; this world has "
-                f"{known_levels} (coarsest first)"
+                f"{known_levels}{order_claim}"
             )
 
         ancestors = {}

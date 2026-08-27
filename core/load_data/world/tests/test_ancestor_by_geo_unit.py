@@ -129,6 +129,37 @@ def test_a_world_file_with_no_level_registry_still_rolls_up(tmp_path):
     assert world.ancestor_by_geo_unit("region") == {10: 10, 20: 10, 30: 10}
 
 
+def test_an_unknown_level_message_drops_the_order_claim_with_no_registry(tmp_path):
+    # The "(coarsest first)" clause is only true when a registry backs it.
+    # With no registry, `geo_levels()`'s order is meaningless (see the trap
+    # above) so the message must not claim otherwise.
+    path = _build_registryless_world(tmp_path / "world_state_no_registry.h5")
+    world = load_world(path)
+
+    with pytest.raises(ValueError) as excinfo:
+        world.ancestor_by_geo_unit("borough")
+
+    assert "coarsest first" not in str(excinfo.value)
+
+
+def test_geo_levels_coarsest_first_returns_the_registry_order(
+    ragged_world_fixture_path,
+):
+    world = load_world(ragged_world_fixture_path)
+
+    assert world.geo_levels_coarsest_first() == ("nation", "region", "area")
+
+
+def test_geo_levels_coarsest_first_raises_with_no_registry(tmp_path):
+    # The order-guaranteeing accessor must fail loud rather than hand back the
+    # first-seen order under the coarsest-first name.
+    path = _build_registryless_world(tmp_path / "world_state_no_registry.h5")
+    world = load_world(path)
+
+    with pytest.raises(ValueError, match="no geo-level registry"):
+        world.geo_levels_coarsest_first()
+
+
 def _build_registryless_world(path):
     """A two-level World file storing level *names*, with no level registry."""
     string_dtype = h5py.string_dtype(encoding="utf-8")
