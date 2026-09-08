@@ -31,6 +31,7 @@ repo root.
 |---|---|
 | `plot_infections_facade.ipynb` | **Start here.** The whole path via the `SimulationEvents` facade |
 | `plot_infections.ipynb` | The same result built from the low-level `june_events` calls |
+| `../stitch_checkpoint_events.py` | Joins a checkpoint-resumed pair of runs into one `simulation_events.h5` |
 
 Both produce the same two-panel figure — infections/day above, deaths and
 hospital admissions below — then a per-geo `Aggregate`. Read the facade one
