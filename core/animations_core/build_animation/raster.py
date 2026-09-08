@@ -94,6 +94,14 @@ def cell_rate_grid(
 
     A cell with no population yields NaN (undefined rate, not inf/0), so the
     alpha ramp leaves it transparent and it is excluded from the global scale.
+
+    Not the same policy as the other two `counts / population * 100_000` sites
+    (see ADR-0007's amendment): a zero-population *cell* is, in normal
+    operation, simply an empty cell with no centroid in it, meant to render
+    transparent. A geo unit that carries events but genuinely has no
+    population is intercepted upstream, before this function ever sees it —
+    per-unit by `render._require_populations` (hard error, map path) or
+    `Aggregate.rate_per_100k` (NaN + warn, table path).
     """
     with np.errstate(divide="ignore", invalid="ignore"):
         rate = counts_grid / population_grid * 100_000.0

@@ -96,3 +96,27 @@ genuine map need for one appear, it costs a single config key — but it must be
 justified by that need, not by unit count. If national maps prove unsatisfactory,
 look first at extent, `grid_resolution`, `sigma` and basemap resolution, which
 are the knobs that actually govern how the field reads.
+
+## Amendment — this is one of three sites writing `counts / population * 100_000`
+
+`_require_populations`'s hard error and `cell_rate_grid`'s arithmetic above are
+two of three places `counts / population * 100_000` is written; the third is
+`Aggregate.rate_per_100k` (ADR-0003, table path). Each is deliberate, for a
+different consumer, and previously undiscoverable from any one site:
+
+1. **`_require_populations`** (here, map path, per geo unit): a unit carrying
+   events but no population is a hard `ValueError` — a NaN would render
+   transparent and silently drop located events, which this ADR's Consequences
+   already record as a deliberate divergence from the **Geo source** skip
+   policy.
+2. **`cell_rate_grid`** (here, per heatmap *cell*): a zero-population cell is,
+   in normal operation, simply an *empty* cell — no centroid in it — meant to
+   render transparent. This is not the same divergence as (1) vs (3): the
+   genuinely-missing-population case never reaches this function, because (1)
+   intercepts it upstream, before rasterisation.
+3. **`Aggregate.rate_per_100k`** (ADR-0003, table path): NaN column + warning
+   instead of a hard error — the milder policy the table path can afford and
+   the map path cannot.
+
+All three are settled policy and cross-reference each other in their
+docstrings; none should be unified as a "cleanup".

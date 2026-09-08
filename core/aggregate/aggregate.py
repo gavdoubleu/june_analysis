@@ -61,6 +61,13 @@ class Aggregate:
         errors earlier in `load_world`); both absent and zero-population units
         are warned about so a genuine geo-level mismatch — a zero-pop unit
         carrying events included — is not silently masked.
+
+        This is one of three sites doing `counts / population * 100_000`, each
+        with a different gap policy for a different consumer (see ADR-0003's
+        amendment): the map path hard-errors instead of warning
+        (`build_animation.render._require_populations`), and the per-cell
+        `build_animation.raster.cell_rate_grid` is a different concept — an
+        empty grid cell, not a missing population — wearing the same arithmetic.
         """
         populations = np.array(
             [population_by_geo_unit.get(int(geo_unit_id), np.nan)

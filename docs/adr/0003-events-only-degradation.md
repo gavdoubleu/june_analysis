@@ -31,3 +31,25 @@ actionable error — never a bare traceback.
   without masking a genuine geo-level mismatch.
 - Two entry conditions to test: events-only (curves work) and events+world
   (maps work, rates available).
+
+## Amendment — this is one of three sites writing `counts / population * 100_000`
+
+`Aggregate.rate_per_100k`'s NaN-and-warn policy above is one of three places the
+rate arithmetic is written, each for a different consumer with a deliberately
+different gap policy — no accident, but previously undiscoverable from any one
+site without a repo-wide search:
+
+1. **`Aggregate.rate_per_100k`** (here, table path): NaN column + warning for a
+   geo unit absent from the population map, or with population 0.
+2. **`build_animation.render._require_populations`** (ADR-0007, map path): a
+   geo unit that carries events but has no population is a hard `ValueError` —
+   a NaN would render transparent and silently drop located events, which the
+   table path's milder policy can tolerate but a map cannot.
+3. **`build_animation.raster.cell_rate_grid`** (ADR-0007): per heatmap *cell*,
+   not per geo unit, and not really the same divergence as (1) vs (2). A
+   zero-population cell there is, in normal operation, the *empty* cell — no
+   centroid in it — meant to render transparent; the genuinely-missing-
+   population case is intercepted by (2) before this function ever runs.
+
+All three are settled policy and cross-reference each other in their
+docstrings; none should be unified as a "cleanup".

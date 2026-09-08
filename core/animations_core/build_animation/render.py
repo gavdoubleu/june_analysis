@@ -163,6 +163,12 @@ def _require_populations(aggregate, population_vector: np.ndarray) -> None:
     ``rate_per_100k`` divides counts by population, so a missing or zero
     population yields NaN, which renders transparent — silently dropping located
     events, the very failure the coordinate policy forbids. Error rather than drop.
+
+    This is one of three sites doing `counts / population * 100_000` (see
+    ADR-0007's amendment): the table path warns and yields NaN instead of
+    erroring (`Aggregate.rate_per_100k`); a missing population never reaches
+    `raster.cell_rate_grid`, which handles the unrelated case of an empty grid
+    cell.
     """
     has_events = aggregate.counts.sum(axis=0) > 0
     unpopulated = has_events & (population_vector <= 0)
