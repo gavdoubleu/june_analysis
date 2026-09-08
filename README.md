@@ -3,7 +3,17 @@
 Render-agnostic analysis platform for the output of any JUNE2 simulation.
 A shared `core/` (data load + aggregate) feeds many consumers — a map animator,
 epidemic-curve plots, summary tables, notebooks. See [CONTEXT.md](CONTEXT.md) for
-the domain glossary and [docs/adr/](docs/adr/) for architecture decisions.
+the domain glossary and [docs/adr/](docs/adr/) for architecture decisions
+(dev branch only — see Branches below).
+
+## Branches
+
+`release` (default, what `git clone` gives you) carries only the app code and
+user docs above — no tests, ADRs, plans, or CONTEXT.md. `dev` is where all
+development happens: full history, tests, `docs/adr/`, `docs/plans/`,
+CONTEXT.md. `release` is squash-synced from `dev` on tagged versions via
+`dev-only/sync_to_release.sh` (see `dev-only/README.md` on `dev`); it has its
+own linear history unrelated to `dev`'s.
 
 ## Layout
 
