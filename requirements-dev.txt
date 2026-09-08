@@ -1,0 +1,3 @@
+# Test runner. Not needed to use the library or render anything, so it is kept
+# out of the runtime groups: `python -m pytest core animations`.
+pytest

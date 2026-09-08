@@ -1,0 +1,26 @@
+# Full England modern run — infections, one frame per day.
+#   python animations/animate_epidemic_example.py --config animations/configs/config_full_england_modern.yaml
+
+world_root:  /home/gavin/Documents/MAY2/MAY/output/2021
+events_root: /home/gavin/Documents/June_plus_plus/JUNE2/runs/run_full_england_modern
+output_root: /home/gavin/Documents/June_plus_plus/june_analysis/animations/output
+
+inputs:
+  events: ${events_root}/simulation_events.h5
+  world:  ${world_root}/world_state_all_ew.h5
+
+aggregate:
+  event_type:     infections
+  days_per_frame: 1
+
+render:
+  # Modern run, so a detailed street basemap is era-appropriate: roads and town
+  # names let the viewer place the heat. Muted, or its colours and labels fight
+  # the low-alpha end of the ramp.
+  basemap_style:   street
+  basemap_opacity: 0.55
+
+output:
+  root:   ${output_root}
+  name:   full_england_modern_infections
+  format: mp4

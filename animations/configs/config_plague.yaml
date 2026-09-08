@@ -1,0 +1,28 @@
+# Plague Preset — cosmetic overlay for the medieval plague-spread recreation.
+# Not the default (CONTEXT: plague is a Preset). Run:
+#   python animations/animate_epidemic_example.py --config animations/configs/config_plague.yaml
+
+# Top-level scalars are interpolation anchors; any ${key} resolves against them.
+# Events and world live in different dirs, hence two roots.
+data_root:   /home/gavin/Documents/Black_Death/Animations/animations/data
+world_root:  /home/gavin/Documents/Black_Death/Animations/data
+output_root: /home/gavin/Documents/June_plus_plus/june_analysis/animations/output
+
+inputs:
+  events: ${data_root}/simulation_events_medieval_data.h5
+  world:  ${world_root}/world_state_medieval.h5
+
+aggregate:
+  event_type:     infections   # required — never inferred (ADR-0008)
+  days_per_frame: 1            # == Aggregate days_per_bin (one knob, two layers)
+
+output:
+  root:   ${output_root}
+  name:   plague_1348
+  format: mp4                  # single format; flip to gif and re-run for a gif
+
+render:                        # -> RenderConfig; cosmetic overrides only
+  ramp:             inferno
+  background_image: ${data_root}/terrain_noshade_log_UTM.png
+  title:            "Plague spread, 1348"
+  fps:              15

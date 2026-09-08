@@ -1,0 +1,11 @@
+# Mandatory core deps: core/load_data + core/aggregate.
+# NOTHING here may pull in matplotlib/ffmpeg/cartopy — the core boundary is
+# render-agnostic (see docs/adr/0002-render-agnostic-core.md). The boundary is
+# enforced by core/*/tests/test_no_render_imports.py, not by this file.
+h5py
+pandas
+numpy
+
+# Optional JIT speed-up for core/aggregate — uncomment to enable. Aggregate MUST
+# run correctly without it (numpy fallback in core/aggregate/kernels.py).
+# numba

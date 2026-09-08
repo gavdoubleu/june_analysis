@@ -1,0 +1,38 @@
+# Recreation of Black_Death/Animations/animations/animate_epidemic.py's default
+# CONFIG, for comparison against the new engine. Best-effort: RenderConfig has
+# no equivalent for the old script's scatter markers, fade distributions,
+# intensity legend, epidemic-curve subplot, or calendar overlay — this matches
+# what carries over (data era, timing, title, ramp, basemap).
+#   python animations/animate_epidemic_example.py --config animations/configs/config_1348_black_death.yaml
+#
+# NOTE: old script's events_file (JUNE2/runs/long_run_sparse/simulation_events.h5)
+# no longer exists on disk. Substituted simulation_events_fitted_with_fairs.h5,
+# which pairs with the *same* world file the old CONFIG used.
+
+data_root:   /home/gavin/Documents/Black_Death/Animations/animations/data
+world_root:  /home/gavin/Documents/MAY2/MAY/output/Medieval
+output_root: /home/gavin/Documents/June_plus_plus/june_analysis/animations/output
+
+inputs:
+  events: ${data_root}/simulation_events_fitted_with_fairs.h5
+  world:  ${world_root}/world_state_medieval_with_fairs_full.h5
+
+aggregate:
+  event_type:     infections   # old script overlaid infections+deaths; engine renders one (ADR-0008)
+  days_per_frame: 1            # == old "days_per_frame"
+
+output:
+  root:   ${output_root}
+  name:   epidemic_1348_black_death
+  format: mp4
+
+render:
+  metric:           count                                 # rate_per_100k gets dominated by one low-pop fair venue (17k infections / pop 226)
+  alpha_power:      0.3                                   # global vmax is set by that same one-off spike; boost mid/low opacity so spread is visible
+  ramp:             inferno                              # closest ramp to old amber->red infection scale
+  background_image: ${data_root}/terrain_noshade_log_UTM.png  # == old "map_image"
+  title:            "1348 England"                        # == old "title"
+  fps:              14                                    # == old "fps"
+  dpi:              120                                   # == old "dpi"
+  figure_height:    8.0                                   # == old figure_size (8, 8)
+  start_date:       "1348-06-01"                          # == old "sim_reference_date"
