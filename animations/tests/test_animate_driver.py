@@ -1,59 +1,10 @@
-"""Driver config logic: interpolation, RenderConfig mapping, error paths.
-
-Behaviour through the driver's public helpers — no HDF5, no render deps. The
-ordering-sensitive engine composition (event_type -> RenderConfig ->
-geo_priority -> located events -> aggregate -> trailing window -> world) lives
-in ``build_pipeline`` and is covered end-to-end in ``test_build_pipeline.py``,
-against real vendored fixtures.
+"""Driver-level behaviour: CLI parsing, input-path resolution, clean error
+surfacing, and the map-only geo-sentinel fallback. Config *schema* (blocks,
+interpolation, unknown-key rejection) is covered in `test_animator_config.py`;
+the ordering-sensitive engine composition in `test_build_pipeline.py`.
 """
 
 import pytest
-
-from ..animate_epidemic_example import resolve_interpolations
-from ..build_pipeline import render_config_from
-
-
-def test_interpolation_resolves_against_top_level_scalars():
-    raw = {
-        "data_root": "/data",
-        "inputs": {"events": "${data_root}/events.h5"},
-    }
-    resolved = resolve_interpolations(raw)
-    assert resolved["inputs"]["events"] == "/data/events.h5"
-
-
-def test_unknown_interpolation_key_raises_clear_error():
-    raw = {"data_root": "/data", "inputs": {"events": "${typo_root}/events.h5"}}
-    with pytest.raises(ValueError, match=r"typo_root.*data_root"):
-        resolve_interpolations(raw)
-
-
-def test_render_block_overrides_only_present_keys():
-    config = render_config_from({"ramp": "inferno", "fps": 15})
-    assert config.ramp == "inferno"
-    assert config.fps == 15
-    # untouched keys keep RenderConfig defaults
-    assert config.metric == "rate_per_100k"
-    assert config.sigma == 2.0
-
-
-def test_empty_render_block_is_all_defaults():
-    from core.animations_core import RenderConfig
-
-    assert render_config_from({}) == RenderConfig()
-    assert render_config_from(None) == RenderConfig()
-
-
-def test_start_date_string_is_coerced_to_date():
-    from datetime import date
-
-    config = render_config_from({"start_date": "1348-06-24"})
-    assert config.start_date == date(1348, 6, 24)
-
-
-def test_unknown_metric_is_rejected():
-    with pytest.raises(ValueError, match="metric"):
-        render_config_from({"metric": "bananas"})
 
 
 def _write_events(path):
@@ -66,61 +17,6 @@ def _write_events(path):
         fh.create_dataset("events/infections", data=rows)
         fh.create_dataset("events/deaths", data=rows)
     return str(path)
-
-
-def test_missing_event_type_errors_listing_available(tmp_path):
-    from core.load_data.simulation_events import SimulationEvents
-
-    from ..build_pipeline import resolve_event_type
-
-    events = SimulationEvents(_write_events(tmp_path / "e.h5"))
-    with pytest.raises(ValueError, match=r"event_type.*infections.*deaths|deaths.*infections"):
-        resolve_event_type(events, {})
-
-
-def test_present_event_type_is_returned(tmp_path):
-    from core.load_data.simulation_events import SimulationEvents
-
-    from ..build_pipeline import resolve_event_type
-
-    events = SimulationEvents(_write_events(tmp_path / "e.h5"))
-    assert resolve_event_type(events, {"event_type": "infections"}) == "infections"
-
-
-def test_unknown_event_type_errors_listing_available(tmp_path):
-    from core.load_data.simulation_events import SimulationEvents
-
-    from ..build_pipeline import resolve_event_type
-
-    events = SimulationEvents(_write_events(tmp_path / "e.h5"))
-    with pytest.raises(ValueError, match="infections"):
-        resolve_event_type(events, {"event_type": "typo"})
-
-
-def test_output_path_uses_explicit_name_and_format():
-    from ..animate_epidemic_example import resolve_output_path
-
-    block = {"root": "out", "name": "plague_1348", "format": "mp4"}
-    assert resolve_output_path(block, "infections") == "out/plague_1348.mp4"
-
-
-def test_output_name_defaults_to_event_type_and_format_to_mp4():
-    from ..animate_epidemic_example import resolve_output_path
-
-    assert resolve_output_path({"root": "out"}, "infections") == "out/infections.mp4"
-
-
-def test_load_config_reads_yaml_and_interpolates(tmp_path):
-    from ..animate_epidemic_example import load_config
-
-    config_file = tmp_path / "c.yaml"
-    config_file.write_text(
-        "data_root: /data\n"
-        "inputs:\n"
-        "  events: ${data_root}/e.h5\n"
-    )
-    config = load_config(config_file)
-    assert config["inputs"]["events"] == "/data/e.h5"
 
 
 def test_cli_defaults_config_to_config_default(tmp_path):
@@ -150,6 +46,43 @@ def test_missing_world_gives_clean_error_not_traceback(tmp_path):
     )
     with pytest.raises(SystemExit, match="World file"):
         main(["--config", str(config_file)])
+
+
+def test_missing_input_path_names_the_key():
+    from ..animate_epidemic_example import resolve_input_path
+
+    with pytest.raises(ValueError, match="inputs.world"):
+        resolve_input_path(None, "world")
+
+
+def test_unedited_template_placeholder_says_so():
+    from ..animate_epidemic_example import resolve_input_path
+
+    # The shipped config_default.yaml is a template; the likeliest first failure
+    # is running it unedited, so the error must point at the config, not h5py.
+    with pytest.raises(FileNotFoundError, match="placeholder"):
+        resolve_input_path("/path/to/your/run/simulation_events.h5", "events")
+
+
+def test_existing_input_path_is_returned(tmp_path):
+    from ..animate_epidemic_example import resolve_input_path
+
+    events = tmp_path / "simulation_events.h5"
+    events.touch()
+    assert resolve_input_path(str(events), "events") == str(events)
+
+
+def test_shipped_default_config_is_path_free_and_parses():
+    """The no---config fallback must not encode any developer's home directory."""
+    from pathlib import Path
+
+    from ..animate_epidemic_example import _DEFAULT_CONFIG
+    from ..animator_config import load_animator_config
+
+    config = load_animator_config(_DEFAULT_CONFIG)  # every ${key} must resolve
+    assert "/home/" not in Path(_DEFAULT_CONFIG).read_text()
+    assert config.inputs.events.startswith("/path/to/")
+    assert not Path(config.output.root).is_absolute()
 
 
 def _write_events_with_seed_venue(path):
@@ -188,45 +121,6 @@ def test_map_located_falls_back_from_seed_venue_to_person_geo(tmp_path):
     located = located_events_for_map(events, "infections")
     # venue 10 -> -1 -> person 1 -> 5 ; venue 11 -> 200 (unchanged).
     np.testing.assert_array_equal(located["geo_unit_id"].to_numpy(), [5.0, 200.0])
-
-
-def test_rate_metric_attributes_by_residence_not_venue():
-    # A rate's denominator is resident population, so its numerator must count
-    # residents; venue attribution puts a fair's visitors on its host unit and
-    # yields impossible rates.
-    from ..build_pipeline import default_geo_priority
-
-    assert default_geo_priority("rate_per_100k") == ("person",)
-
-
-def test_count_metric_keeps_venue_attribution():
-    # No denominator, so "where transmission happened" is the useful signal.
-    from ..build_pipeline import default_geo_priority
-
-    assert default_geo_priority("count") == ("venue", "person")
-
-
-def test_config_geo_priority_overrides_the_metric_default():
-    from ..build_pipeline import resolve_geo_priority
-
-    # counts by residence — the configurable case
-    assert resolve_geo_priority({"geo_priority": ["person"]}, "count") == ("person",)
-    # a bare string is accepted alongside a list
-    assert resolve_geo_priority({"geo_priority": "person"}, "count") == ("person",)
-
-
-def test_absent_geo_priority_falls_back_to_metric_default():
-    from ..build_pipeline import resolve_geo_priority
-
-    assert resolve_geo_priority({}, "rate_per_100k") == ("person",)
-    assert resolve_geo_priority({}, "count") == ("venue", "person")
-
-
-def test_unknown_geo_priority_source_is_rejected():
-    from ..build_pipeline import resolve_geo_priority
-
-    with pytest.raises(ValueError, match="geo_priority.*postcode"):
-        resolve_geo_priority({"geo_priority": ["postcode"]}, "count")
 
 
 def test_person_priority_attributes_event_to_residence_not_venue(tmp_path):
@@ -268,80 +162,30 @@ def test_map_located_drops_geo_still_unplaceable(tmp_path):
     assert np.isnan(located["geo_unit_id"].to_numpy()).all()
 
 
-def test_trailing_window_config_reaches_back_so_frame_one_lands_on_time_start():
-    # time_start means "start the animation here", not "ignore earlier events":
-    # the driver aggregates from far enough back that the first *complete*
-    # window ends on the configured day, so no burn-in-skipping frame is lost.
-    import numpy as np
-    import pandas as pd
+def test_missing_event_type_errors_listing_available(tmp_path):
+    from core.load_data.simulation_events import SimulationEvents
 
-    from core.aggregate.aggregate import aggregate_events
-    from core.aggregate.trailing_window import trailing_mean
+    from ..build_pipeline import resolve_event_type
 
-    from ..build_pipeline import aggregation_time_start
-
-    aggregate_block = {"time_start": 100.0, "days_per_frame": 1, "window_days": 7}
-    assert aggregation_time_start(aggregate_block) == 94.0
-
-    # One event a day from day 90 to 109, all in one geo unit.
-    events = pd.DataFrame(
-        {"time": np.arange(90.0, 110.0) + 0.5, "geo_unit_id": np.full(20, 5)}
-    )
-    aggregate = aggregate_events(
-        events,
-        event_type="infections",
-        days_per_bin=1.0,
-        time_start=aggregation_time_start(aggregate_block),
-    )
-    windowed = trailing_mean(aggregate, window_days=7.0)
-
-    assert windowed.bin_starts[0] == 100.0
-    # Days 94-100 each carried one event, so the first frame's mean is 1.
-    assert windowed.counts[0, 0] == pytest.approx(1.0)
+    events = SimulationEvents(_write_events(tmp_path / "e.h5"))
+    with pytest.raises(ValueError, match=r"event_type.*infections.*deaths|deaths.*infections"):
+        resolve_event_type(events, None)
 
 
-def test_aggregation_time_start_untouched_without_a_trailing_window():
-    from ..build_pipeline import aggregation_time_start
+def test_present_event_type_is_returned(tmp_path):
+    from core.load_data.simulation_events import SimulationEvents
 
-    assert aggregation_time_start({"time_start": 100.0, "days_per_frame": 1}) == 100.0
-    # Nothing to reach back to when the start is inferred from the first event.
-    assert aggregation_time_start({"window_days": 7}) is None
+    from ..build_pipeline import resolve_event_type
 
-
-def test_missing_input_path_names_the_key(tmp_path):
-    from ..animate_epidemic_example import resolve_input_path
-
-    with pytest.raises(ValueError, match="inputs.world"):
-        resolve_input_path({"events": str(tmp_path)}, "world")
+    events = SimulationEvents(_write_events(tmp_path / "e.h5"))
+    assert resolve_event_type(events, "infections") == "infections"
 
 
-def test_unedited_template_placeholder_says_so(tmp_path):
-    from ..animate_epidemic_example import resolve_input_path
+def test_unknown_event_type_errors_listing_available(tmp_path):
+    from core.load_data.simulation_events import SimulationEvents
 
-    # The shipped config_default.yaml is a template; the likeliest first failure
-    # is running it unedited, so the error must point at the config, not h5py.
-    with pytest.raises(FileNotFoundError, match="placeholder"):
-        resolve_input_path({"events": "/path/to/your/run/simulation_events.h5"}, "events")
+    from ..build_pipeline import resolve_event_type
 
-
-def test_existing_input_path_is_returned(tmp_path):
-    from ..animate_epidemic_example import resolve_input_path
-
-    events = tmp_path / "simulation_events.h5"
-    events.touch()
-    assert resolve_input_path({"events": str(events)}, "events") == str(events)
-
-
-def test_shipped_default_config_is_path_free_and_parses():
-    """The no---config fallback must not encode any developer's home directory."""
-    from pathlib import Path
-
-    import yaml
-
-    from ..animate_epidemic_example import _DEFAULT_CONFIG, resolve_interpolations
-
-    raw = yaml.safe_load(Path(_DEFAULT_CONFIG).read_text())
-    config = resolve_interpolations(raw)  # every ${key} must resolve
-    assert "/home/" not in Path(_DEFAULT_CONFIG).read_text()
-    assert config["inputs"]["events"].startswith("/path/to/")
-    assert not Path(config["output"]["root"]).is_absolute()
+    events = SimulationEvents(_write_events(tmp_path / "e.h5"))
+    with pytest.raises(ValueError, match="infections"):
+        resolve_event_type(events, "typo")

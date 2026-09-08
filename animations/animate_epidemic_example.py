@@ -1,14 +1,14 @@
 """Config-driven animator driver (Phase 4b Consumer).
 
-A thin app over the Phase 4a engine: reads a ``--config`` YAML, resolves input
-paths, hands the ordering-sensitive composition to :mod:`build_pipeline`, and
-writes one animation to ``animations/output/``. Lives in ``animations/`` (a
-Consumer), imports nothing new into ``core/``.
+A thin app over the Phase 4a engine: loads a ``--config`` YAML via
+:mod:`animations.animator_config`, resolves input paths, hands the
+ordering-sensitive composition to :mod:`build_pipeline`, and writes one
+animation to ``animations/output/``. Lives in ``animations/`` (a Consumer),
+imports nothing new into ``core/``.
 """
 
 from __future__ import annotations
 
-import re
 import sys
 from pathlib import Path
 
@@ -19,9 +19,8 @@ _REPO_ROOT = Path(__file__).resolve().parent.parent
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
+from animations.animator_config import AnimatorConfig, load_animator_config
 from animations.build_pipeline import build_pipeline
-
-_INTERPOLATION = re.compile(r"\$\{([^}]+)\}")
 
 _DEFAULT_CONFIG = Path(__file__).parent / "configs" / "config_default.yaml"
 
@@ -47,28 +46,7 @@ def parse_args(argv=None):
     return parser.parse_args(argv)
 
 
-def load_config(path) -> dict:
-    """Read a config YAML and resolve its ``${...}`` interpolations."""
-    import yaml
-
-    with open(path) as handle:
-        raw = yaml.safe_load(handle) or {}
-    return resolve_interpolations(raw)
-
-
-def resolve_output_path(output_block: dict, event_type: str) -> str:
-    """Assemble ``{root}/{name}.{format}`` for the single output (decision 6).
-
-    ``name`` defaults to ``event_type``; ``format`` defaults to ``mp4`` (flip to
-    ``gif`` and re-run for a second format — the driver never emits two per run).
-    """
-    root = output_block.get("root", "output")
-    name = output_block.get("name") or event_type
-    fmt = output_block.get("format", "mp4")
-    return str(Path(root) / f"{name}.{fmt}")
-
-
-def resolve_input_path(inputs: dict, key: str) -> str:
+def resolve_input_path(path: str | None, key: str) -> str:
     """One `inputs:` path, checked for existence before any reader touches it.
 
     The shipped ``config_default.yaml`` is a template with ``/path/to/...``
@@ -77,7 +55,6 @@ def resolve_input_path(inputs: dict, key: str) -> str:
     flags and o_flags; say it plainly instead.
     """
     kind, filename = _INPUT_KINDS[key]
-    path = inputs.get(key)
     if not path:
         raise ValueError(
             f"inputs.{key} is missing from the config; it must point at your "
@@ -93,42 +70,7 @@ def resolve_input_path(inputs: dict, key: str) -> str:
     return path
 
 
-def resolve_interpolations(raw: dict) -> dict:
-    """Resolve ``${key}`` references against ``raw``'s top-level scalars.
-
-    Generic interpolation (mirrors MAY's ``config.yaml``): any ``${key}`` in a
-    string value is replaced by the top-level scalar ``key``. Supports the
-    events/world-in-different-dirs case; absolute paths carry no ``${}`` and pass
-    through untouched.
-    """
-    anchors = {
-        key: value
-        for key, value in raw.items()
-        if isinstance(value, (str, int, float, bool))
-    }
-
-    def resolve_key(match):
-        key = match.group(1)
-        if key not in anchors:
-            raise ValueError(
-                f"unknown interpolation ${{{key}}}; define it as a top-level "
-                f"scalar. Available: {sorted(anchors)}"
-            )
-        return str(anchors[key])
-
-    def substitute(value):
-        if isinstance(value, str):
-            return _INTERPOLATION.sub(resolve_key, value)
-        if isinstance(value, dict):
-            return {key: substitute(item) for key, item in value.items()}
-        if isinstance(value, list):
-            return [substitute(item) for item in value]
-        return value
-
-    return substitute(raw)
-
-
-def run(config: dict) -> str:
+def run(config: AnimatorConfig) -> str:
     """Compose the engine from a resolved config and write one animation.
 
     Orchestration only: resolve input paths, hand the ordering-sensitive
@@ -137,19 +79,17 @@ def run(config: dict) -> str:
     from core.animations_core import animate
     from core.load_data.simulation_events import SimulationEvents
 
-    inputs = config.get("inputs", {})
-    aggregate_block = config.get("aggregate", {})
-    output_block = config.get("output", {})
-
     # Both paths up front: a missing World file should not surface only after the
     # whole events load and aggregate have run.
-    events_path = resolve_input_path(inputs, "events")
-    world_path = resolve_input_path(inputs, "world")
+    events_path = resolve_input_path(config.inputs.events, "events")
+    world_path = resolve_input_path(config.inputs.world, "world")
 
     events = SimulationEvents(events_path)
-    outputs = build_pipeline(events, aggregate_block, config.get("render"), world_path)
+    outputs = build_pipeline(events, config.aggregate, config.render, world_path)
 
-    output_path = resolve_output_path(output_block, outputs.event_type)
+    # build_pipeline raised already if aggregate.event_type were missing/unknown,
+    # so config.resolved_output_path's event_type matches outputs.event_type here.
+    output_path = config.resolved_output_path
     Path(output_path).parent.mkdir(parents=True, exist_ok=True)
 
     animate(
@@ -157,7 +97,7 @@ def run(config: dict) -> str:
         outputs.world,
         outputs.render_config,
         output_path,
-        output_block.get("format"),
+        config.output.format,
     )
     return output_path
 
@@ -167,7 +107,7 @@ def main(argv=None) -> None:
     config/data failures into a clean one-line message, not a raw traceback."""
     args = parse_args(argv)
     try:
-        output_path = run(load_config(args.config))
+        output_path = run(load_animator_config(args.config))
     except (FileNotFoundError, KeyError, ValueError) as error:
         raise SystemExit(f"error: {error}")
     print(f"wrote {output_path}")
